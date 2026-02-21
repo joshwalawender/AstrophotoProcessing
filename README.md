@@ -4,7 +4,7 @@
 
 Data Model for Single OSC File
 - astropy.io.fits.HDUList
-    - HDU [raw]: original raw file
+    - HDU [PRIMARY]: original raw file
     - HDU [processed]: current full resolution data + standardized header
         - Header: use HISTORY cards?
     - HDU [blue]: blue data downsampled 2x2
