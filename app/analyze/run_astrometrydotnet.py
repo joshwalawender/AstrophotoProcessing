@@ -54,18 +54,11 @@ def solve_field(datamodel, cfg={}):
     if tfile.name.replace('.fits', '.solved') in temp_files:
         wcs_file = tfolder / tfile.name.replace('.fits', '.wcs')
         new_wcs = wcs.WCS(str(wcs_file))
-
-        # Update data model
-        now = datetime.datetime.now()
-        nowstr = now.strftime('%Y-%m-%D %H:%M:%S')
-        datamodel.data.wcs = new_wcs
-        datamodel.hdulist[1].header.set('BIASSUB', True, 'Bias subtracted')
-        datamodel.hdulist[1].header.add_history('New WCS solved by astrometry.net')
         new_header = new_wcs.to_header(relax=True)
-        for card in new_header.cards:
-            print(card)
-            datamodel.hdulist[1].header.set(card.keyword, card.value, card.comment)
-
+        # Update data model
+        datamodel.update_data(None,
+                              header=new_header.cards,
+                              history=['WCS solved by astrometry.net'])
     for f in temp_contents:
         print(str(f))
         f.unlink()
