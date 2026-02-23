@@ -4,6 +4,7 @@
 from pathlib import Path
 import datetime
 import subprocess
+import numpy as np
 from astropy import wcs
 
 from app.data_models.OSCImage import OSCImage
@@ -12,7 +13,7 @@ from app.data_models.OSCImage import OSCImage
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def solve_field(datamodel, cfg={}):
+def solve_field(datamodel, cfg={}, center_coord=None):
     assert isinstance(datamodel, OSCImage)
 
     cmd = [cfg['Astrometry.net'].get('solve-field','solve-field')]
@@ -35,6 +36,11 @@ def solve_field(datamodel, cfg={}):
             cmd.extend(['-L', f'{0.95*pscale:.3f}'])
             cmd.extend(['-H', f'{1.05*pscale:.3f}'])
             cmd.extend(['-u', 'arcsecperpix'])
+    # Center Coordinate
+    if center_coord is not None:
+        cmd.extend(['-3', f'{center_coord.ra.deg:.3f}'])
+        cmd.extend(['-4', f'{center_coord.dec.deg:.3f}'])
+        cmd.extend(['-5', f'0.1'])
 
     # run astrometry.net on the temporary fits file
     tfile = datamodel.write_tmp()
@@ -51,7 +57,10 @@ def solve_field(datamodel, cfg={}):
         print(line)
     temp_contents = [f for f in tfolder.glob('*')]
     temp_files = [f.name for f in temp_contents]
-    if tfile.name.replace('.fits', '.solved') in temp_files:
+    if tfile.name.replace('.fits', '.solved') not in temp_files:
+        center_coord = None
+        radius = None
+    else:
         wcs_file = tfolder / tfile.name.replace('.fits', '.wcs')
         new_wcs = wcs.WCS(str(wcs_file))
         new_header = new_wcs.to_header(relax=True)
@@ -59,7 +68,14 @@ def solve_field(datamodel, cfg={}):
         datamodel.update_data(None,
                               header=new_header.cards,
                               history=['WCS solved by astrometry.net'])
+        # Calculate and return center coordinate and field radius
+        center_coord = new_wcs.pixel_to_world(datamodel.data.shape[0]/2, datamodel.data.shape[1]/2)
+        fp = new_wcs.calc_footprint(axes=datamodel.data.shape)
+        dra = fp[:,0].max() - fp[:,0].min()
+        ddec = fp[:,1].max() - fp[:,1].min()
+        radius = np.sqrt((dra*np.cos(fp[:,1].mean()*np.pi/180.))**2 + ddec**2)/2.
     for f in temp_contents:
-        print(str(f))
+        print(f"Deleted temp file: {str(f)}")
         f.unlink()
+    return center_coord, radius
 
