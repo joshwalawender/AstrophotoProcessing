@@ -77,5 +77,6 @@ def solve_field(datamodel, cfg={}, center_coord=None):
     for f in temp_contents:
         print(f"Deleted temp file: {str(f)}")
         f.unlink()
-    return center_coord, radius
+    datamodel.center_coord = center_coord
+    datamodel.radius = radius
 

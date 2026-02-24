@@ -6,26 +6,27 @@ from astropy import units as u
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def get_Gaia(center_coord, radius):
-    from astroquery.gaia import Gaia
-    Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source"
-    Gaia.ROW_LIMIT = 5000
-    r = Gaia.cone_search_async(center_coord, radius=radius*u.deg)
-    results = r.get_results()
-    return results
+def query_vizier(datamodel, Gmag_limit=13, catalog='Gaia DR3'):
+    Vizier_name = {'Gaia DR3': 'I/355/gaiadr3'}
 
-
-def query_vizier(center_coord, radius, Gmag_limit=13, catalog='I/355/gaiadr3'):
     from astroquery.vizier import Vizier
     vizier = Vizier(column_filters={"Gmag":f"<{Gmag_limit:.1f}"})
     vizier.ROW_LIMIT = 10000
-    r = vizier.query_region(center_coord, radius=radius*u.deg, catalog=catalog)
-    return r[0]
+    r = vizier.query_region(datamodel.center_coord,
+                            radius=datamodel.radius*u.deg,
+                            catalog=Vizier_name[catalog])
+    if len(r[0]) > 0:
+        datamodel.stars[catalog] = r[0]
 
 
-
-
-
+# def get_Gaia(center_coord, radius):
+#     from astroquery.gaia import Gaia
+#     Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source"
+#     Gaia.ROW_LIMIT = 5000
+#     r = Gaia.cone_search_async(center_coord, radius=radius*u.deg)
+#     results = r.get_results()
+#     return results
+#
 #print(gaia.keys())
 #['solution_id', 'DESIGNATION', 'SOURCE_ID', 'random_index', 'ref_epoch',
 #'ra', 'ra_error', 'dec', 'dec_error',
