@@ -6,7 +6,9 @@ from astropy import units as u
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def query_vizier(datamodel, Gmag_limit=13, catalog='Gaia DR3'):
+def query_vizier(datamodel, cfg=None):
+    catalog = cfg['Catalog'].get('catalog')
+    Gmag_limit = cfg['Catalog'].getfloat('GmagLimit')
     Vizier_name = {'Gaia DR3': 'I/355/gaiadr3'}
 
     from astroquery.vizier import Vizier
