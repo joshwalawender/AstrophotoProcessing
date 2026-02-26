@@ -1,35 +1,36 @@
 from pathlib import Path
+import sys
 import copy
 import tempfile
 import datetime
 
 import numpy as np
+from astropy import units as u
 from astropy.io import fits
 from astropy.nddata import CCDData, block_reduce
+from astropy.table import Table
+from astropy.coordinates import SkyCoord, ICRS
+from astropy import wcs
 import ccdproc
 
 
 class OSCImage(object):
     def __init__(self, hdulist, *args, **kwargs):
-        if type(hdulist) in [str, Path]:
+        if isinstance(hdulist, str):
             hdulist = Path(hdulist).expanduser().absolute()
+        if isinstance(hdulist, Path):
+            hdulist = hdulist.expanduser().absolute()
             assert hdulist.exists()
             hdulist = fits.open(hdulist)
+        else:
+            print(f"HDUList input {type(hdulist)} is unknown")
+            sys.exit(1)
         self.hdulist = hdulist
+        self.hdulist.verify("fix")
         self.hdu_names = [hdu.name for hdu in self.hdulist]
-        self.center_coord = None # SkyCoord of center of field (pointing)
-        self.radius = None # Radius in degrees of the field (for catalog query)
-        self.stars = {} # Dictionary of tables for catalog stars
 
         # Assume first extension is primary (Raw data)
         assert self.hdu_names[0] == 'PRIMARY'
-
-        # Build data object
-        self.data = CCDData(data=copy.deepcopy(self.hdulist[0].data),
-                            meta={'APP_DM': 'OSCImage'},
-                            unit='adu',
-                            )
-        self.split_colors()
 
         # Create PROCESSED extension if needed
         if 'PROCESSED' not in self.hdu_names:
@@ -41,10 +42,41 @@ class OSCImage(object):
                                           header=header,
                                           name='PROCESSED')
             self.hdulist.append(processed_hdu)
+            self.data = CCDData(data=copy.deepcopy(processed_hdu.data),
+                                meta={'APP_DM': 'OSCImage'},
+                                unit='adu',
+                                )
+            self.center_coord = None
+            self.radius = None
         else:
-            processed = get_HDU('PROCESSED')
+            processed = self.getHDU('PROCESSED')
             # Check this is our data model
-            assert processed.header.get('APP_DM') == 'OSCIMAGE'
+            assert self.hdulist[processed].header.get('APP_DM') == 'OSCImage'
+            self.data = CCDData(data=self.hdulist[processed].data,
+                                meta={'APP_DM': 'OSCImage'},
+                                unit='adu',
+                                )
+            ra_str = self.hdulist[processed].header.get('CENT_RA', None)
+            dec_str = self.hdulist[processed].header.get('CENT_DEC', None)
+            if ra_str and dec_str:
+                self.center_coord = SkyCoord(ra_str, dec_str, frame=ICRS,
+                                             unit=(u.hourangle, u.deg))
+            else:
+                self.center_coord = None
+            fovrad = self.hdulist[processed].header.get('FOVRAD', None)
+            if fovrad:
+                self.radius = float(fovrad)
+            else:
+                self.radius = None
+        self.split_colors()
+
+        # Build Catalogs
+        if 'Gaia DR3' not in self.hdu_names:
+            self.stars = {} # Dictionary of tables for catalog stars
+        else:
+            gaiaDR3 = self.getHDU('Gaia DR3')
+            self.stars = {'Gaia DR3': Table(self.hdulist[gaiaDR3].data)}
+
 
 
     def getHDU(self, name):
@@ -96,6 +128,14 @@ class OSCImage(object):
         nowstr = now.strftime('%Y-%m-%D %H:%M:%S')
         for historyline in history:
             self.hdulist[1].header.add_history(f"{nowstr}: {historyline}")
+
+
+    def get_wcs(self):
+        processed = self.getHDU('PROCESSED')
+        if processed >= 0:
+            return wcs.WCS(self.hdulist[processed].header)
+        else:
+            return None
 
 
     def write_tmp(self):
