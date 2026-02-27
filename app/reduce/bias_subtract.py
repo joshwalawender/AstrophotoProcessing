@@ -1,9 +1,6 @@
 #!python3
 
-## Import General Tools
-import datetime
 import ccdproc
-from astropy.io import fits
 
 from app import log
 from app.data_models.OSCImage import OSCImage

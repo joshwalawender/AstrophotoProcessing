@@ -1,6 +1,5 @@
 #!python3
 
-## Import General Tools
 import numpy as np
 from astropy import units as u
 from astropy import stats

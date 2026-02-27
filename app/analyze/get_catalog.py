@@ -1,6 +1,5 @@
 #!python3
 
-## Import General Tools
 from astropy import units as u
 from astropy.time import Time
 from astropy.table import Table, Column

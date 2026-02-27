@@ -1,6 +1,5 @@
 #!python3
 
-## Import General Tools
 from pathlib import Path
 import datetime
 import subprocess
