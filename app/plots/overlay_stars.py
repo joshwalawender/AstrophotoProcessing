@@ -40,18 +40,9 @@ def overlay_stars(datamodel, cfg=None):
                 s=3*star_r, c='y', marker='+',
                 linewidths=0.5, edgecolors=None, alpha=0.5)
 
-    # Overlay Centroided Star Positions
-#     centroided = ~np.isnan(stars['Centroid_X'])
-#     print(f"Overlaying {np.sum(centroided)} centroided star positions")
-#     for star in stars[centroided]:
-#         c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
-#                        radius=2*star_r, edgecolor='b', facecolor='none',
-#                        alpha=0.5)
-#         plt.gca().add_artist(c)
-
-    # Overlay Stars with Good Photometry
-    good_photometry = stars[stars['Photometry'] & ~stars['Outliers']]
-    log.info(f"  Overlaying {len(good_photometry)} stars with good photometry")
+    # Overlay Stars with Good G Photometry
+    good_photometry = stars[stars['GPhotometry'] & ~stars['GOutliers']]
+    log.info(f"  Overlaying {len(good_photometry)} stars with good G photometry")
     for star in good_photometry:
         c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
                        radius=star_r, edgecolor='b', facecolor='none',
@@ -67,8 +58,8 @@ def overlay_stars(datamodel, cfg=None):
         plt.gca().add_artist(c)
 
     # Overlay Photometry Outliers
-    outliers = stars[stars['Outliers']]
-    log.info(f"  Overlaying {len(outliers)} photometry outlier stars")
+    outliers = stars[stars['GOutliers']]
+    log.info(f"  Overlaying {len(outliers)} G photometry outlier stars")
     for star in outliers:
         c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
                        radius=star_r, edgecolor='r', facecolor='none',

@@ -18,38 +18,43 @@ def plot_zeropoints(datamodel, cfg=None):
     catalog = cfg['Catalog'].get('catalog')
     stars = datamodel.stars.get(catalog, [])
 
-    photometry = stars[stars['Photometry'] == True]
-    good_photometry = stars[stars['Photometry'] & ~stars['Outliers']]
-    outliers = stars[stars['Outliers'] == True]
+    plt.rcParams.update({'font.size': 5})
+    plt.figure(figsize=(8,6), dpi=100)
+    plot_colors = {'R': 'red', 'G': 'green', 'B': 'blue'}
+    for c,color in enumerate(datamodel.zero_point.keys()):
+        photometry = stars[stars[f'{color}Photometry']]
+        good_photometry = stars[stars[f'{color}Photometry'] & ~stars[f'{color}Outliers']]
+        outliers = stars[stars[f'{color}Outliers']]
 
-    plt.figure(figsize=(8,6))
+        plt.subplot(3,2,2*c+1)
+#         plt.title(f'{color} Zero Point = {datamodel.zero_point[color]:.3f} (std = {datamodel.zero_point_stddev[color]:.3f})')
+        binsize = 0.05
+        min_bin = np.round(datamodel.zero_point[color]/binsize)*binsize - 10*np.round(datamodel.zero_point_stddev[color]/binsize)*binsize
+        max_bin = np.round(datamodel.zero_point[color]/binsize)*binsize + 10*np.round(datamodel.zero_point_stddev[color]/binsize)*binsize
+        bins = np.arange(min_bin, max_bin+binsize, binsize)
+        plt.hist(good_photometry[f'{color}ZeroPoint'], bins=bins,
+                 color=plot_colors[color], alpha=0.8,
+                 label=f'{color}Zero Point Values')
+        plt.hist(outliers[f'{color}ZeroPoint'], bins=bins, color='k', alpha=0.3,
+                 label='5 sigma Outliers')
+        plt.axvline(datamodel.zero_point[color], color='k',
+                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.3f}')
+        plt.axvline(datamodel.zero_point[color]-datamodel.zero_point_stddev[color],
+                    color='k', linestyle=':')
+        plt.axvline(datamodel.zero_point[color]+datamodel.zero_point_stddev[color],
+                    color='k', linestyle=':')
+        plt.legend(loc='best')
+        if c == 2: plt.ylabel('Number of Stars')
 
-    plt.subplot(2,1,1)
-    plt.title(f'Image Zero Point = {datamodel.zero_point:.3f} (std = {datamodel.zero_point_stddev:.3f})')
-    binsize = 0.05
-    min_bin = np.round(datamodel.zero_point/binsize)*binsize - 10*np.round(datamodel.zero_point_stddev/binsize)*binsize
-    max_bin = np.round(datamodel.zero_point/binsize)*binsize + 10*np.round(datamodel.zero_point_stddev/binsize)*binsize
-    bins = np.arange(min_bin, max_bin+binsize, binsize)
-    plt.hist(good_photometry['ZeroPoint'], bins=bins, color='green', alpha=0.8,
-             label='Zero Point Values')
-    plt.hist(outliers['ZeroPoint'], bins=bins, color='red', alpha=0.3,
-             label='5 sigma Outliers')
-    plt.axvline(datamodel.zero_point, color='k',
-                label=f'Zero Point = {datamodel.zero_point:.3f}')
-    plt.axvline(datamodel.zero_point-datamodel.zero_point_stddev,
-                color='k', linestyle=':')
-    plt.axvline(datamodel.zero_point+datamodel.zero_point_stddev, color='k', linestyle=':')
-    plt.legend(loc='best')
-    plt.ylabel('Number of Stars')
-
-    plt.subplot(2,1,2)
-    plt.plot(good_photometry['ZeroPoint'], good_photometry['Gmag'], 'bo', ms=4,
-             label='Zero Point Values')
-    plt.plot(outliers['ZeroPoint'], outliers['Gmag'], 'rx', ms=4,
-             label='5 sigma Outliers')
-    plt.legend(loc='best')
-    plt.xlabel('Zero Point (mag)')
-    plt.ylabel('Gaia G Magnitude')
+        plt.subplot(3,2,2*c+2)
+        catalog_mag_name = cfg['Catalog'].get(f'{color}mag')
+        plt.plot(good_photometry[f'{color}ZeroPoint'], good_photometry[catalog_mag_name],
+                 f'{color.lower()}o', ms=4, label=f'{color} Zero Point Values')
+        plt.plot(outliers[f'{color}ZeroPoint'], outliers[catalog_mag_name],
+                 'kx', ms=4, label='5 sigma Outliers')
+        plt.legend(loc='best')
+        plt.xlabel('Zero Point (mag)')
+        if c == 2: plt.ylabel(f'{catalog} {catalog_mag_name} Magnitude')
 
     # Save PNG
     ext = Path(datamodel.raw_file_name).suffix

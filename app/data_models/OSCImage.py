@@ -32,6 +32,10 @@ class OSCImage(object):
         self.hdulist = hdulist
         self.hdulist.verify("fix")
         self.hdu_names = [hdu.name for hdu in self.hdulist]
+        self.zero_point = {}
+        self.zero_point_stddev = {}
+        self.fwhm = None
+        self.fwhm_stddev = None
 
         # Assume first extension is primary (Raw data)
         assert self.hdu_names[0] == 'PRIMARY'
@@ -53,10 +57,6 @@ class OSCImage(object):
                                 )
             self.center_coord = None
             self.radius = None
-            self.zero_point = None
-            self.zero_point_stddev = None
-            self.fwhm = None
-            self.fwhm_stddev = None
         else:
             processed = self.getHDU('PROCESSED')
             # Check this is our data model
@@ -78,16 +78,23 @@ class OSCImage(object):
             else:
                 self.radius = None
             self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
-            hdr_zp = self.hdulist[processed].header.get('ZEROPNT', None)
-            self.zero_point = float(hdr_zp) if hdr_zp is not None else None
-            hdr_zp_std = self.hdulist[processed].header.get('ZPSTDDEV', None)
-            self.zero_point_stddev = float(hdr_zp_std) if hdr_zp_std is not None else None
+
+            # Read in Zero Point Values
+            for color in ['R', 'G', 'B']:
+                hdr_zp = self.hdulist[processed].header.get(f'{color}ZEROPNT', None)
+                if hdr_zp:
+                    self.zero_point[color] = float(hdr_zp)
+                hdr_zp_std = self.hdulist[processed].header.get('ZPSTDDEV', None)
+                if hdr_zp_std:
+                    self.zero_point_stddev[color] = float(hdr_zp_std)
+
+            # Read in FWHM Values
             hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
             self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
             hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
             self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
 
-        self.split_colors()
+        self.build_color_mask()
 
         # Build Catalogs
         if 'Gaia DR3' not in self.hdu_names:
@@ -97,7 +104,9 @@ class OSCImage(object):
             self.stars = {'Gaia DR3': Table(self.hdulist[gaiaDR3].data)}
 
 
-
+    ##-------------------------------------------------------------------------
+    ## getHDU
+    ##-------------------------------------------------------------------------
     def getHDU(self, name):
         self.hdu_names = [hdu.name for hdu in self.hdulist]
         try:
@@ -107,29 +116,39 @@ class OSCImage(object):
         return ind
 
 
-    def split_colors(self):
+    ##-------------------------------------------------------------------------
+    ## build_color_mask
+    ##-------------------------------------------------------------------------
+    def build_color_mask(self):
         self.bayer = []
         for row in range(self.data.shape[0]):
             if row%2==0: self.bayer.append(['R', 'G']*int(self.data.shape[1]/2))
             if row%2!=0: self.bayer.append(['G', 'B']*int(self.data.shape[1]/2))
         self.bayer = np.array(self.bayer)
-        self.red_mask = self.bayer == 'R'
-        self.green_mask = self.bayer == 'G'
-        self.blue_mask = self.bayer == 'B'
-        red = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.red_mask),
+        self.mask = {'R': self.bayer == 'R',
+                     'G': self.bayer == 'G',
+                     'B': self.bayer == 'B'}
+
+    ##-------------------------------------------------------------------------
+    ## split_colors
+    ##-------------------------------------------------------------------------
+    def split_colors(self):
+        red = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['R']),
                            2, func=np.nanmean)
         self.red = CCDData(data=red, unit='adu',
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Red'})
-        green = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.green_mask),
+        green = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['G']),
                            2, func=np.nanmean)
         self.green = CCDData(data=green, unit='adu',
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Green'})
-        blue = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.blue_mask),
+        blue = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['B']),
                            2, func=np.nanmean)
         self.blue = CCDData(data=blue, unit='adu',
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Blue'})
 
-
+    ##-------------------------------------------------------------------------
+    ## update_data
+    ##-------------------------------------------------------------------------
     def update_data(self, newdata, header=[], history=[]):
         '''Update the .data attribute (the CCDData object) and add any header
         and history lines to the .hdulist[1].header
@@ -137,7 +156,7 @@ class OSCImage(object):
         # Image Data
         if isinstance(newdata, CCDData):
             self.data = newdata
-            self.split_colors()
+#             self.split_colors()
         # Header
         pind = self.getHDU('PROCESSED')
         for h in header:
@@ -149,6 +168,9 @@ class OSCImage(object):
             self.hdulist[1].header.add_history(f"{nowstr}: {historyline}")
 
 
+    ##-------------------------------------------------------------------------
+    ## get_wcs
+    ##-------------------------------------------------------------------------
     def get_wcs(self):
         processed = self.getHDU('PROCESSED')
         if processed >= 0:
@@ -157,6 +179,9 @@ class OSCImage(object):
             return None
 
 
+    ##-------------------------------------------------------------------------
+    ## write_tmp
+    ##-------------------------------------------------------------------------
     def write_tmp(self):
         '''Write a single extension FITS file for temporary use (e.g. by
         astrometry.net)
@@ -167,6 +192,9 @@ class OSCImage(object):
         return tfile
 
 
+    ##-------------------------------------------------------------------------
+    ## write
+    ##-------------------------------------------------------------------------
     def write(self, filename, overwrite=True):
         '''Write a Multi-Extension FITS file to hold the entire data model.
         '''
@@ -185,11 +213,11 @@ class OSCImage(object):
                                       'Radius encompassing FoV [degrees]')
         self.hdulist[pind].header.set('RAWNAME', str(self.raw_file_name),
                                       'Original (raw) file name')
-        if self.zero_point:
-            self.hdulist[pind].header.set('ZEROPNT', f'{self.zero_point:.3f}',
-                                          'Calculated Zero Point (Green)')
-            self.hdulist[pind].header.set('ZPSTDDEV', f'{self.zero_point_stddev:.3f}',
-                                          'Calculated Zero Point Std Dev (Green)')
+        for color in self.zero_point.keys():
+            self.hdulist[pind].header.set(f'{color}ZEROPNT', f'{self.zero_point.get(color):.3f}',
+                                          f'Calculated Zero Point ({color})')
+            self.hdulist[pind].header.set(f'{color}ZPSTDDEV', f'{self.zero_point_stddev.get(color):.3f}',
+                                          f'Calculated Zero Point Std Dev ({color})')
         if self.fwhm:
             self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
                                           'Typical FWHM')
@@ -197,14 +225,14 @@ class OSCImage(object):
                                           'FWHM Std Dev')
 
         # Three Colors
-        for color in ['RED', 'GREEN', 'BLUE']:
-            cind = self.getHDU(color)
-            chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
-            chdu.header.set('EXTNAME', color)
-            if cind == -1:
-                self.hdulist.append(chdu)
-            else:
-                self.hdulist[cind] = chdu
+#         for color in ['RED', 'GREEN', 'BLUE']:
+#             cind = self.getHDU(color)
+#             chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
+#             chdu.header.set('EXTNAME', color)
+#             if cind == -1:
+#                 self.hdulist.append(chdu)
+#             else:
+#                 self.hdulist[cind] = chdu
 
         # Write Catalog Stars to FITS Table
         for catalog in self.stars.keys():
@@ -217,18 +245,3 @@ class OSCImage(object):
                 self.hdulist.append(FITStable)
         # Write to file
         self.hdulist.writeto(filename, overwrite=overwrite)
-
-
-# HDU [PRIMARY]: original raw file
-# HDU [PROCESSED]: current full resolution data + standardized header
-# HDU [BLUE]: blue data downsampled 2x2
-# HDU [GREEN]: green data downsampled 2x2
-# HDU [RED]: red data downsampled 2x2
-# HDU [blue_bkg]: blue background downsampled 2x2
-# HDU [green_bkg]: green background downsampled 2x2
-# HDU [red_bkg]: red background downsampled 2x2
-# HDU [blue_var]: blue variance downsampled 2x2
-# HDU [green_var]: green variance downsampled 2x2
-# HDU [red_var]: red variance downsampled 2x2
-# HDU [catalog_<catalogname>]: FITS table of catalog stars
-# HDU [photometry]: FITS table of photometry results

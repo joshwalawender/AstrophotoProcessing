@@ -37,6 +37,9 @@ SIPorder = 4
 [Catalog]
 catalog = Gaia DR3
 GmagLimit = 16
+Gmag = Gmag
+Rmag = RPmag
+Bmag = BPmag
 
 [Photometry]
 StarApertureRadius = 9
@@ -58,7 +61,7 @@ if not working_file.exists():
     bias_subtract(image, master_bias=OSCImage(master_bias_file))
     solve_field(image, cfg=cfg)
     full_catalog = query_vizier(image, cfg=cfg)
-    image.write('test.fits')
+    image.write(working_file)
 else:
     image = OSCImage(working_file)
 
