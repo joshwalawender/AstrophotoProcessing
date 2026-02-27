@@ -40,7 +40,6 @@ class OSCImage(object):
         self.fwhm = None
         self.fwhm_stddev = None
         self.tempdir = Path(tempfile.mkdtemp())
-        self.build_color_mask()
 
         # Connect to ds9 via SAMP
         try:
@@ -69,6 +68,7 @@ class OSCImage(object):
                                 meta={'APP_DM': 'OSCImage'},
                                 unit='adu',
                                 )
+            self.build_color_mask()
             self.center_coord = None
             self.radius = None
         else:
@@ -79,6 +79,7 @@ class OSCImage(object):
                                 meta={'APP_DM': 'OSCImage'},
                                 unit='adu',
                                 )
+            self.build_color_mask()
             ra_str = self.hdulist[processed].header.get('CENT_RA', None)
             dec_str = self.hdulist[processed].header.get('CENT_DEC', None)
             if ra_str and dec_str:
