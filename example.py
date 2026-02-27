@@ -10,7 +10,6 @@ from app.reduce.bias_subtract import bias_subtract
 from app.analyze.run_astrometrydotnet import solve_field
 from app.analyze.get_catalog import query_vizier
 from app.analyze.photometry import photometry
-from app.plots.overlay_stars import overlay_stars
 from app.plots.plot_zeropoints import plot_zeropoints
 
 
@@ -68,5 +67,5 @@ else:
 
 photometry(image, cfg=cfg)
 
-overlay_stars(image, cfg=cfg)
+image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
 plot_zeropoints(image, cfg=cfg)

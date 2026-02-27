@@ -11,7 +11,10 @@ from astropy.nddata import CCDData, block_reduce
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, ICRS
 from astropy import wcs
+from astropy import visualization as vis
 import ccdproc
+
+from matplotlib import pyplot as plt
 
 from app import log
 
@@ -245,3 +248,71 @@ class OSCImage(object):
                 self.hdulist.append(FITStable)
         # Write to file
         self.hdulist.writeto(filename, overwrite=overwrite)
+
+
+    ##-------------------------------------------------------------------------
+    ## write_to_jpg
+    ##-------------------------------------------------------------------------
+    def write_jpg(self, radius=8):
+        '''Take the catalog stars and WCS and generate a PNG file 
+        '''
+        log.info('Generating JPG image')
+        catalog = list(self.stars.keys())[0]
+        stars = self.stars.get(catalog, [])
+    
+        norm = vis.ImageNormalize(self.data,
+                                  interval=vis.AsymmetricPercentileInterval(1, 99.99),
+                                  stretch=vis.LogStretch())
+        plt.figure(figsize=(12,12), dpi=300)
+        plt.imshow(self.data, cmap=plt.cm.gray, norm=norm)
+        plt.xlim(0,self.data.shape[1])
+        plt.ylim(0,self.data.shape[0])
+        plt.xticks([])
+        plt.yticks([])
+    
+        # Overlay Catalog Star Positions as WCS Evaluation
+        log.info(f"  Overlaying catalog star positions")
+        plt.scatter(stars['Catalog_X'], stars['Catalog_Y'],
+                    s=3*radius, c='y', marker='+',
+                    linewidths=0.5, edgecolors=None, alpha=0.5)
+    
+        # Overlay Stars with Good G Photometry
+        good_photometry = stars[stars['GPhotometry'] & ~stars['GOutliers']]
+        log.info(f"  Overlaying {len(good_photometry)} stars with good G photometry")
+        for star in good_photometry:
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=radius, edgecolor='b', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=2*radius, edgecolor='b', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=3*radius, edgecolor='b', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+    
+        # Overlay Photometry Outliers
+        outliers = stars[stars['GOutliers']]
+        log.info(f"  Overlaying {len(outliers)} G photometry outlier stars")
+        for star in outliers:
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=radius, edgecolor='r', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=2*radius, edgecolor='r', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+            c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
+                           radius=3*radius, edgecolor='r', facecolor='none',
+                           alpha=0.5)
+            plt.gca().add_artist(c)
+    
+        # Save JPEG
+        ext = Path(self.raw_file_name).suffix
+        jpeg_file = Path(self.raw_file_name.replace(ext, '.jpg'))
+        if jpeg_file.exists(): jpeg_file.unlink()
+        log.info(f"Saving {str(jpeg_file)}")
+        plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
