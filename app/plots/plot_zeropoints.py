@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
 
+from app import log
+
 
 ##-------------------------------------------------------------------------
 ## 
@@ -12,6 +14,7 @@ from matplotlib import pyplot as plt
 def plot_zeropoints(datamodel, cfg=None):
     '''
     '''
+    log.info('Plotting distribution of zero point values in image')
     catalog = cfg['Catalog'].get('catalog')
     stars = datamodel.stars.get(catalog, [])
 
@@ -52,5 +55,5 @@ def plot_zeropoints(datamodel, cfg=None):
     ext = Path(datamodel.raw_file_name).suffix
     plot_file = Path(datamodel.raw_file_name.replace(ext, '_zp.png'))
     if plot_file.exists(): plot_file.unlink()
-    print(f"Saving {str(plot_file)}")
+    log.info(f"Saving {str(plot_file)}")
     plt.savefig(plot_file, bbox_inches='tight', pad_inches=0.1, dpi=300)

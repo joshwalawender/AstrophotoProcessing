@@ -7,6 +7,7 @@ import subprocess
 import numpy as np
 from astropy import wcs
 
+from app import log
 from app.data_models.OSCImage import OSCImage
 
 
@@ -46,15 +47,16 @@ def solve_field(datamodel, cfg={}, center_coord=None):
     tfile = datamodel.write_tmp()
     tfolder = tfile.parent
     cmd.append(str(tfile))
+    log.info('Running Astrometry.net')
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print('Astrometry.net STDOUT')
+    log.debug('Astrometry.net STDOUT')
     stdout_lines = proc.stdout.decode().strip().split('\n')
     for line in stdout_lines:
-        print(line)
+        log.debug(f"  {line}")
     stderr_lines = proc.stderr.decode().strip().split('\n')
-    if len(stderr_lines) > 0: print('Astrometry.net STDERR')
+    if len(stderr_lines) > 0: log.debug('Astrometry.net STDERR')
     for line in stderr_lines:
-        print(line)
+        log.debug(f"  {line}")
     temp_contents = [f for f in tfolder.glob('*')]
     temp_files = [f.name for f in temp_contents]
     if tfile.name.replace('.fits', '.solved') not in temp_files:
@@ -70,13 +72,16 @@ def solve_field(datamodel, cfg={}, center_coord=None):
                               history=['WCS solved by astrometry.net'])
         # Calculate and return center coordinate and field radius
         center_coord = new_wcs.pixel_to_world(datamodel.data.shape[0]/2, datamodel.data.shape[1]/2)
+        center_coord_str = center_coord.to_string("hmsdms", sep=":", precision=1)
         fp = new_wcs.calc_footprint(axes=datamodel.data.shape)
         dra = fp[:,0].max() - fp[:,0].min()
         ddec = fp[:,1].max() - fp[:,1].min()
         radius = np.sqrt((dra*np.cos(fp[:,1].mean()*np.pi/180.))**2 + ddec**2)/2.
     for f in temp_contents:
-        print(f"Deleted temp file: {str(f)}")
+        log.debug(f"Deleted temp file: {str(f)}")
         f.unlink()
+    log.info(f'  Central Coordinate: {center_coord_str}')
+    log.info(f'  FoV radius: {radius:.1f} deg')
     datamodel.center_coord = center_coord
     datamodel.radius = radius
 

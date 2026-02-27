@@ -13,6 +13,8 @@ from astropy.coordinates import SkyCoord, ICRS
 from astropy import wcs
 import ccdproc
 
+from app import log
+
 
 class OSCImage(object):
     def __init__(self, hdulist, *args, **kwargs):
@@ -22,6 +24,7 @@ class OSCImage(object):
             hdulist = hdulist.expanduser().absolute()
             assert hdulist.exists()
             self.raw_file_name = hdulist.name
+            log.info(f'Instantiating data model from {self.raw_file_name}')
             hdulist = fits.open(hdulist)
         else:
             print(f"HDUList input {type(hdulist)} is unknown")

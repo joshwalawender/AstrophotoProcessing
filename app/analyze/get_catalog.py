@@ -6,6 +6,8 @@ from astropy.time import Time
 from astropy.table import Table, Column
 from astropy.coordinates import SkyCoord, ICRS
 
+from app import log
+
 
 ##-------------------------------------------------------------------------
 ## 
@@ -18,6 +20,7 @@ def query_vizier(datamodel, cfg=None):
     from astroquery.vizier import Vizier
     vizier = Vizier(column_filters={"Gmag":f"<{Gmag_limit:.1f}"})
     vizier.ROW_LIMIT = 10000
+    log.info(f'Querying Vizier for {catalog} stars')
     r = vizier.query_region(datamodel.center_coord,
                             radius=datamodel.radius*u.deg,
                             catalog=Vizier_name[catalog])
@@ -32,6 +35,9 @@ def query_vizier(datamodel, cfg=None):
         x, y = wcs.world_to_pixel(coords)
         stars.add_column(Column(name='Catalog_X', data=x))
         stars.add_column(Column(name='Catalog_Y', data=y))
+
+        log.info(f'  Retrieved {len(stars)} catalog stars in area')
+        log.info(f'  Image contains {len(stars[contains])} stars')
 
         datamodel.stars[catalog] = stars[contains]
         return stars

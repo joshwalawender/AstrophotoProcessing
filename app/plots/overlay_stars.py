@@ -10,6 +10,8 @@ from astropy.coordinates import SkyCoord, ICRS
 
 from matplotlib import pyplot as plt
 
+from app import log
+
 
 ##-------------------------------------------------------------------------
 ## 
@@ -17,6 +19,7 @@ from matplotlib import pyplot as plt
 def overlay_stars(datamodel, cfg=None):
     '''Take the catalog stars and WCS and generate a PNG file 
     '''
+    log.info('Generating JPG image')
     catalog = cfg['Catalog'].get('catalog')
     star_r = cfg['Photometry'].getfloat('StarApertureRadius')
     stars = datamodel.stars.get(catalog, [])
@@ -32,7 +35,7 @@ def overlay_stars(datamodel, cfg=None):
     plt.yticks([])
 
     # Overlay Catalog Star Positions as WCS Evaluation
-    print(f"Overlaying catalog star positions")
+    log.info(f"  Overlaying catalog star positions")
     plt.scatter(stars['Catalog_X'], stars['Catalog_Y'],
                 s=3*star_r, c='y', marker='+',
                 linewidths=0.5, edgecolors=None, alpha=0.5)
@@ -48,7 +51,7 @@ def overlay_stars(datamodel, cfg=None):
 
     # Overlay Stars with Good Photometry
     good_photometry = stars[stars['Photometry'] & ~stars['Outliers']]
-    print(f"Overlaying {len(good_photometry)} stars with good photometry")
+    log.info(f"  Overlaying {len(good_photometry)} stars with good photometry")
     for star in good_photometry:
         c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
                        radius=star_r, edgecolor='b', facecolor='none',
@@ -65,7 +68,7 @@ def overlay_stars(datamodel, cfg=None):
 
     # Overlay Photometry Outliers
     outliers = stars[stars['Outliers']]
-    print(f"Overlaying {len(outliers)} photometry outlier stars")
+    log.info(f"  Overlaying {len(outliers)} photometry outlier stars")
     for star in outliers:
         c = plt.Circle((star['Centroid_X'], star['Centroid_Y']),
                        radius=star_r, edgecolor='r', facecolor='none',
@@ -84,5 +87,5 @@ def overlay_stars(datamodel, cfg=None):
     ext = Path(datamodel.raw_file_name).suffix
     jpeg_file = Path(datamodel.raw_file_name.replace(ext, '.jpg'))
     if jpeg_file.exists(): jpeg_file.unlink()
-    print(f"Saving {str(jpeg_file)}")
+    log.info(f"Saving {str(jpeg_file)}")
     plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)

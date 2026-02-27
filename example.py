@@ -4,6 +4,7 @@ import configparser
 
 import numpy as np
 
+from app import log
 from app.data_models.OSCImage import OSCImage
 from app.reduce.bias_subtract import bias_subtract
 from app.analyze.run_astrometrydotnet import solve_field
@@ -35,7 +36,7 @@ SIPorder = 4
 
 [Catalog]
 catalog = Gaia DR3
-GmagLimit = 15
+GmagLimit = 16
 
 [Photometry]
 StarApertureRadius = 9
@@ -56,13 +57,9 @@ if not working_file.exists():
     image = OSCImage(raw_file)
     bias_subtract(image, master_bias=OSCImage(master_bias_file))
     solve_field(image, cfg=cfg)
-    if image.center_coord is not None:
-        print(image.center_coord.to_string('hmsdms', precision=1))
-        print(image.radius)
     full_catalog = query_vizier(image, cfg=cfg)
     image.write('test.fits')
 else:
-    print('Loading Existing Image')
     image = OSCImage(working_file)
 
 photometry(image, cfg=cfg)
