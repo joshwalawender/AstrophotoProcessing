@@ -259,7 +259,7 @@ class OSCImage(object):
         log.info('Generating JPG image')
         catalog = list(self.stars.keys())[0]
         stars = self.stars.get(catalog, [])
-    
+
         norm = vis.ImageNormalize(self.data,
                                   interval=vis.AsymmetricPercentileInterval(1, 99.99),
                                   stretch=vis.LogStretch())
@@ -269,13 +269,13 @@ class OSCImage(object):
         plt.ylim(0,self.data.shape[0])
         plt.xticks([])
         plt.yticks([])
-    
+
         # Overlay Catalog Star Positions as WCS Evaluation
         log.info(f"  Overlaying catalog star positions")
         plt.scatter(stars['Catalog_X'], stars['Catalog_Y'],
                     s=3*radius, c='y', marker='+',
                     linewidths=0.5, edgecolors=None, alpha=0.5)
-    
+
         # Overlay Stars with Good G Photometry
         good_photometry = stars[stars['GPhotometry'] & ~stars['GOutliers']]
         log.info(f"  Overlaying {len(good_photometry)} stars with good G photometry")
@@ -292,7 +292,7 @@ class OSCImage(object):
                            radius=3*radius, edgecolor='b', facecolor='none',
                            alpha=0.5)
             plt.gca().add_artist(c)
-    
+
         # Overlay Photometry Outliers
         outliers = stars[stars['GOutliers']]
         log.info(f"  Overlaying {len(outliers)} G photometry outlier stars")
@@ -309,7 +309,7 @@ class OSCImage(object):
                            radius=3*radius, edgecolor='r', facecolor='none',
                            alpha=0.5)
             plt.gca().add_artist(c)
-    
+
         # Save JPEG
         ext = Path(self.raw_file_name).suffix
         jpeg_file = Path(self.raw_file_name.replace(ext, '.jpg'))
