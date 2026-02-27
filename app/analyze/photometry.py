@@ -24,11 +24,12 @@ def photometry(datamodel, cfg=None):
     apertures = aperture.CircularAperture(positions, star_r)
     sky_apertures = aperture.CircularAnnulus(positions, 2*star_r, 3*star_r)
     # Generate Background Subtracted Image for ApertureStats
-    full_image = u.Quantity(np.array(datamodel.data))/datamodel.exptime
-    image_backsub = u.Quantity(np.array(datamodel.data) - np.median(datamodel.data))/datamodel.exptime
+    image = u.Quantity(np.array(datamodel.data))
+    scaled_image = u.Quantity(np.array(datamodel.data))/datamodel.exptime
+    backsub_image = u.Quantity(np.array(datamodel.data) - np.median(datamodel.data))
     ## Centroid stars and determine FWHM
     log.info(f'Centroiding catalog stars')
-    apstats = aperture.ApertureStats(image_backsub, apertures)
+    apstats = aperture.ApertureStats(image, apertures)
     aperture_properties = [('Centroid_X', 'xcentroid'),
                            ('Centroid_Y', 'ycentroid'),
                            ('FWHM', 'fwhm'),
@@ -48,13 +49,13 @@ def photometry(datamodel, cfg=None):
     ## Perform aperture photometry on stars
     for color in ['R', 'G', 'B']:
         log.info(f'Performing {color} aperture photometry on catalog stars')
-        star_area = apertures.area_overlap(full_image,
+        star_area = apertures.area_overlap(scaled_image,
                                            mask=datamodel.mask[color])
-        star, errs = apertures.do_photometry(full_image,
+        star, errs = apertures.do_photometry(scaled_image,
                                              mask=datamodel.mask[color])
-        sky_area = sky_apertures.area_overlap(full_image,
+        sky_area = sky_apertures.area_overlap(scaled_image,
                                               mask=datamodel.mask[color])
-        sky, sky_errs = sky_apertures.do_photometry(full_image,
+        sky, sky_errs = sky_apertures.do_photometry(scaled_image,
                                                     mask=datamodel.mask[color])
         stars.add_column(Column(name=f'{color}StarArea', data=star_area))
         stars.add_column(Column(name=f'{color}StarSum', data=star))
@@ -65,7 +66,10 @@ def photometry(datamodel, cfg=None):
         # Calculate Zero Point Values
         flux = stars[f'{color}StarSum'] - stars[f'{color}StarArea']*stars[f'{color}SkyMean']
         stars.add_column(Column(name=f'{color}StarFlux', data=flux))
-        stars.add_column(Column(name=f'{color}Photometry', data=~np.isnan(stars[f'{color}StarFlux'])))
+        has_flux = ~np.isnan(stars[f'{color}StarFlux'])
+        not_saturated = stars['peak_value'] < float(cfg['Photometry'].get('SaturationThreshold', 60000))
+        good_photometry = has_flux & not_saturated
+        stars.add_column(Column(name=f'{color}Photometry', data=good_photometry))
         instmag = -2.5*np.log10(flux)
         stars.add_column(Column(name=f'{color}InstMag', data=instmag))
         catalog_mag_name = cfg['Catalog'].get(f'{color}mag')

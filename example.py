@@ -43,6 +43,7 @@ Bmag = BPmag
 
 [Photometry]
 StarApertureRadius = 9
+SaturationThreshold = 60000
 ''')
 #index-dir = /Volumes/Ohina2External/astrometry_data
 

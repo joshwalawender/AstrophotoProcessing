@@ -34,7 +34,7 @@ def plot_zeropoints(datamodel, cfg=None):
         bins = np.arange(min_bin, max_bin+binsize, binsize)
         plt.hist(good_photometry[f'{color}ZeroPoint'], bins=bins,
                  color=plot_colors[color], alpha=0.8,
-                 label=f'{color}Zero Point Values')
+                 label=f'{color} Zero Point Values')
         plt.hist(outliers[f'{color}ZeroPoint'], bins=bins, color='k', alpha=0.3,
                  label='5 sigma Outliers')
         plt.axvline(datamodel.zero_point[color], color='k',
@@ -44,17 +44,23 @@ def plot_zeropoints(datamodel, cfg=None):
         plt.axvline(datamodel.zero_point[color]+datamodel.zero_point_stddev[color],
                     color='k', linestyle=':')
         plt.legend(loc='best')
-        if c == 2: plt.ylabel('Number of Stars')
+        plt.ylabel('Number of Stars')
+        if c == 2: plt.xlabel('Zero Point (mag)')
 
         plt.subplot(3,2,2*c+2)
-        catalog_mag_name = cfg['Catalog'].get(f'{color}mag')
-        plt.plot(good_photometry[f'{color}ZeroPoint'], good_photometry[catalog_mag_name],
-                 f'{color.lower()}o', ms=4, label=f'{color} Zero Point Values')
-        plt.plot(outliers[f'{color}ZeroPoint'], outliers[catalog_mag_name],
-                 'kx', ms=4, label='5 sigma Outliers')
+        plt.plot(good_photometry['peak_value'], good_photometry[f'{color}ZeroPoint'],
+                 f'{color.lower()}o', ms=4, alpha=0.3, mew=0,
+                 label=f'{color} Zero Point Values')
+        plt.plot(outliers['peak_value'], outliers[f'{color}ZeroPoint'], 
+                 'kx', ms=3, alpha=0.5,
+                 label='5 sigma Outliers')
+        plt.axhline(datamodel.zero_point[color], color='k', alpha=0.5,
+                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.3f}')
         plt.legend(loc='best')
-        plt.xlabel('Zero Point (mag)')
-        if c == 2: plt.ylabel(f'{catalog} {catalog_mag_name} Magnitude')
+        plt.xscale('log')
+        plt.xlim(7e2,8e4)
+        if c == 2: plt.xlabel('Peak Pixel Value in Star (ADU)')
+        plt.ylabel('Zero Point (mag)')
 
     # Save PNG
     ext = Path(datamodel.raw_file_name).suffix
