@@ -45,7 +45,7 @@ class OSCImage(object):
         try:
             self.ds9 = samp.SAMPIntegratedClient()
             self.ds9.connect()
-        except Exceptions as e:
+        except Exception as e:
             print('Unable to connect to ds9')
             print(e)
             self.ds9 = None
