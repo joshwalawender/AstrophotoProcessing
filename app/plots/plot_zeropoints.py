@@ -38,7 +38,7 @@ def plot_zeropoints(datamodel, cfg=None):
         plt.hist(outliers[f'{color}ZeroPoint'], bins=bins, color='k', alpha=0.3,
                  label='5 sigma Outliers')
         plt.axvline(datamodel.zero_point[color], color='k',
-                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.3f}')
+                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.2f}')
         plt.axvline(datamodel.zero_point[color]-datamodel.zero_point_stddev[color],
                     color='k', linestyle=':')
         plt.axvline(datamodel.zero_point[color]+datamodel.zero_point_stddev[color],
@@ -55,7 +55,7 @@ def plot_zeropoints(datamodel, cfg=None):
                  'kx', ms=3, alpha=0.5,
                  label='5 sigma Outliers')
         plt.axhline(datamodel.zero_point[color], color='k', alpha=0.5,
-                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.3f}')
+                    label=f'{color} Zero Point = {datamodel.zero_point[color]:.2f}')
         plt.legend(loc='best')
         plt.xscale('log')
         plt.xlim(7e2,8e4)
