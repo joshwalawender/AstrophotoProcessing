@@ -8,7 +8,9 @@ from app.data_models.OSCImage import OSCImage
 from app.reduce.bias_subtract import bias_subtract
 from app.analyze.run_astrometrydotnet import solve_field
 from app.analyze.get_catalog import query_vizier
-from app.analyze.centroid_stars import centroid_stars
+from app.analyze.photometry import photometry
+from app.plots.overlay_stars import overlay_stars
+from app.plots.plot_zeropoints import plot_zeropoints
 
 
 ##-------------------------------------------------------------------------
@@ -33,7 +35,7 @@ SIPorder = 4
 
 [Catalog]
 catalog = Gaia DR3
-GmagLimit = 11
+GmagLimit = 15
 
 [Photometry]
 StarApertureRadius = 6
@@ -58,12 +60,11 @@ if not working_file.exists():
         print(image.center_coord.to_string('hmsdms', precision=1))
         print(image.radius)
     query_vizier(image, cfg=cfg)
+    photometry(image, cfg=cfg)
     image.write('test.fits')
 else:
     print('Loading Existing Image')
     image = OSCImage(working_file)
 
-if catalog in image.stars.keys():
-    print(image.stars.get(catalog)['RAJ2000', 'DEJ2000', 'Gmag', 'BPmag', 'RPmag'])
-    print(image.stars.get(catalog).keys())
-centroid_stars(image, cfg=cfg)
+overlay_stars(image, cfg=cfg)
+plot_zeropoints(image, cfg=cfg)

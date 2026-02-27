@@ -2,6 +2,10 @@
 
 ## Import General Tools
 from astropy import units as u
+from astropy.time import Time
+from astropy.table import Table, Column
+from astropy.coordinates import SkyCoord, ICRS
+
 
 ##-------------------------------------------------------------------------
 ## 
@@ -17,8 +21,17 @@ def query_vizier(datamodel, cfg=None):
     r = vizier.query_region(datamodel.center_coord,
                             radius=datamodel.radius*u.deg,
                             catalog=Vizier_name[catalog])
-    if len(r[0]) > 0:
-        datamodel.stars[catalog] = r[0]
+    assert len(r) > 0
+    stars = r[0]
+    if len(stars) > 0:
+        wcs = datamodel.get_wcs()
+        coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
+                          unit=(u.deg, u.deg),
+                          obstime=Time(2000, format='decimalyear'))
+        x, y = wcs.world_to_pixel(coords)
+        stars.add_column(Column(name='Catalog_X', data=x))
+        stars.add_column(Column(name='Catalog_Y', data=y))
+        datamodel.stars[catalog] = stars
 
 
 # def get_Gaia(center_coord, radius):

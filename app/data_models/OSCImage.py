@@ -21,6 +21,7 @@ class OSCImage(object):
         if isinstance(hdulist, Path):
             hdulist = hdulist.expanduser().absolute()
             assert hdulist.exists()
+            self.raw_file_name = hdulist.name
             hdulist = fits.open(hdulist)
         else:
             print(f"HDUList input {type(hdulist)} is unknown")
@@ -31,13 +32,14 @@ class OSCImage(object):
 
         # Assume first extension is primary (Raw data)
         assert self.hdu_names[0] == 'PRIMARY'
+        self.exptime = float(self.hdulist[0].header.get('EXPTIME', 0))
 
         # Create PROCESSED extension if needed
         if 'PROCESSED' not in self.hdu_names:
             # This is a new data model
             # Build PROCESSED Extension
             header = fits.Header()
-            header.set('APP_DM', 'OSCIMAGE', 'Which type of APP data model is this?')
+            header.set('APP_DM', 'OSCImage', 'Which type of APP data model is this?')
             processed_hdu = fits.ImageHDU(data=hdulist[0].data,
                                           header=header,
                                           name='PROCESSED')
@@ -48,6 +50,8 @@ class OSCImage(object):
                                 )
             self.center_coord = None
             self.radius = None
+            self.zero_point = None
+            self.zero_point_stddev = None
         else:
             processed = self.getHDU('PROCESSED')
             # Check this is our data model
@@ -68,6 +72,9 @@ class OSCImage(object):
                 self.radius = float(fovrad)
             else:
                 self.radius = None
+            self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
+            self.zero_point = float(self.hdulist[processed].header.get('ZEROPNT', None))
+            self.zero_point_stddev = float(self.hdulist[processed].header.get('ZPSTDDEV', None))
         self.split_colors()
 
         # Build Catalogs
@@ -120,9 +127,9 @@ class OSCImage(object):
             self.data = newdata
             self.split_colors()
         # Header
+        pind = self.getHDU('PROCESSED')
         for h in header:
-            print(h)
-            self.hdulist[1].header.set(*h)
+            self.hdulist[pind].header.set(*h)
         # History
         now = datetime.datetime.now()
         nowstr = now.strftime('%Y-%m-%D %H:%M:%S')
@@ -155,8 +162,7 @@ class OSCImage(object):
         # Processed Image Data
         pind = self.getHDU('PROCESSED')
         phdu = self.data.to_hdu(as_image_hdu=True)[0]
-        phdu.header.set('EXTNAME', 'PROCESSED')
-        self.hdulist[pind] = phdu
+        self.hdulist[pind].data = phdu.data
         # Header info
         cra, cdec = self.center_coord.to_string('hmsdms', sep=':', precision=2).split()
         self.hdulist[pind].header.set('CENT_RA', cra,
@@ -165,6 +171,13 @@ class OSCImage(object):
                                       'Dec coordinate at center of FoV')
         self.hdulist[pind].header.set('FOVRAD', f'{self.radius:.3f}',
                                       'Radius encompassing FoV [degrees]')
+        self.hdulist[pind].header.set('RAWNAME', str(self.raw_file_name),
+                                      'Original (raw) file name')
+        if self.zero_point:
+            self.hdulist[pind].header.set('ZEROPNT', f'{self.zero_point:.3f}',
+                                          'Calculated Zero Point (Green)')
+            self.hdulist[pind].header.set('ZPSTDDEV', f'{self.zero_point_stddev:.3f}',
+                                          'Calculated Zero Point Std Dev (Green)')
 
         # Three Colors
         for color in ['RED', 'GREEN', 'BLUE']:
