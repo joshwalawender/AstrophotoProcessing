@@ -39,6 +39,17 @@ class OSCImage(object):
         self.zero_point_stddev = {}
         self.fwhm = None
         self.fwhm_stddev = None
+        self.tempdir = Path(tempfile.mkdtemp())
+        self.build_color_mask()
+
+        # Connect to ds9 via SAMP
+        try:
+            self.ds9 = samp.SAMPIntegratedClient()
+            self.ds9.connect()
+        except Exceptions as e:
+            print('Unable to connect to ds9')
+            print(e)
+            self.ds9 = None
 
         # Assume first extension is primary (Raw data)
         assert self.hdu_names[0] == 'PRIMARY'
@@ -96,8 +107,6 @@ class OSCImage(object):
             self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
             hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
             self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
-
-        self.build_color_mask()
 
         # Build Catalogs
         if 'Gaia DR3' not in self.hdu_names:
@@ -189,8 +198,7 @@ class OSCImage(object):
         '''Write a single extension FITS file for temporary use (e.g. by
         astrometry.net)
         '''
-        tdir = tempfile.mkdtemp()
-        tfile = Path(tdir) / 'app_temp_image.fits'
+        tfile = self.tempdir / 'app_temp_image.fits'
         ccdproc.fits_ccddata_writer(self.data, tfile)
         return tfile
 
@@ -251,7 +259,7 @@ class OSCImage(object):
 
 
     ##-------------------------------------------------------------------------
-    ## write_to_jpg
+    ## write_jpg
     ##-------------------------------------------------------------------------
     def write_jpg(self, radius=8):
         '''Take the catalog stars and WCS and generate a PNG file 
