@@ -52,6 +52,8 @@ class OSCImage(object):
             self.radius = None
             self.zero_point = None
             self.zero_point_stddev = None
+            self.fwhm = None
+            self.fwhm_stddev = None
         else:
             processed = self.getHDU('PROCESSED')
             # Check this is our data model
@@ -73,8 +75,15 @@ class OSCImage(object):
             else:
                 self.radius = None
             self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
-            self.zero_point = float(self.hdulist[processed].header.get('ZEROPNT', None))
-            self.zero_point_stddev = float(self.hdulist[processed].header.get('ZPSTDDEV', None))
+            hdr_zp = self.hdulist[processed].header.get('ZEROPNT', None)
+            self.zero_point = float(hdr_zp) if hdr_zp is not None else None
+            hdr_zp_std = self.hdulist[processed].header.get('ZPSTDDEV', None)
+            self.zero_point_stddev = float(hdr_zp_std) if hdr_zp_std is not None else None
+            hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
+            self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
+            hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
+            self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
+
         self.split_colors()
 
         # Build Catalogs
@@ -178,6 +187,11 @@ class OSCImage(object):
                                           'Calculated Zero Point (Green)')
             self.hdulist[pind].header.set('ZPSTDDEV', f'{self.zero_point_stddev:.3f}',
                                           'Calculated Zero Point Std Dev (Green)')
+        if self.fwhm:
+            self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
+                                          'Typical FWHM')
+            self.hdulist[pind].header.set('FWHMSTD', f'{self.fwhm_stddev:.2f}',
+                                          'FWHM Std Dev')
 
         # Three Colors
         for color in ['RED', 'GREEN', 'BLUE']:

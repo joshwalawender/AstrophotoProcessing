@@ -32,9 +32,14 @@ def photometry(datamodel, cfg=None):
     for p in aperture_properties:
         stars.add_column(Column(name=p[0], data=getattr(apstats, p[1])))
 
+    # Record Typical FWHM
+    fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
+    fwhm_mean, fwhm_median, fwhm_stddev = stats.sigma_clipped_stats(fwhm_values)
+    datamodel.fwhm = fwhm_median
+    datamodel.fwhm_stddev = fwhm_stddev
+
     ## Perform aperture photometry on stars
-    photometry = aperture.aperture_photometry(im, apertures)
-    print(photometry[100:140])
+    photometry = aperture.aperture_photometry(im, apertures, mask=datamodel.green_mask)
     stars.add_column(Column(name='StarArea', data=[apertures.area]*len(stars)))
     stars.add_column(Column(name='StarSum', data=photometry['aperture_sum']))
 #     stars.add_column(Column(name='StarSumErr', data=photometry['aperture_sum_err']))
@@ -48,17 +53,23 @@ def photometry(datamodel, cfg=None):
 
     flux = stars['StarSum'] - stars['StarArea']/stars['SkyArea']*stars['SkySum']
     stars.add_column(Column(name='StarFlux', data=flux))
+    wphot = ~np.isnan(stars['StarFlux'])
+    stars.add_column(Column(name='Photometry', data=wphot))
     instmag = -2.5*np.log10(flux)
     stars.add_column(Column(name='InstMag', data=instmag))
     zp = stars['Gmag'] - stars['InstMag']
     stars.add_column(Column(name='ZeroPoint', data=zp))
-    wphot = ~np.isnan(stars['StarFlux'])
-    stars.add_column(Column(name='Photometry', data=wphot))
 
+    # Record Typical ZeroPoint
     zp_values = stars['ZeroPoint'][stars['Photometry'] == True]
     zp_mean, zp_median, zp_stddev = stats.sigma_clipped_stats(zp_values)
     datamodel.zero_point = zp_median
     datamodel.zero_point_stddev = zp_stddev
+
+    # Look at Zero Point statistics and flag outlier stars
+    outliers = abs(stars['ZeroPoint']-zp_median) > 5*zp_stddev
+    print(f"Found {np.sum(outliers)} outlier stars")
+    stars.add_column(Column(name='Outliers', data=outliers))
 
     datamodel.stars[catalog] = stars
     

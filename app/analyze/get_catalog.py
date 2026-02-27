@@ -28,10 +28,15 @@ def query_vizier(datamodel, cfg=None):
         coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                           unit=(u.deg, u.deg),
                           obstime=Time(2000, format='decimalyear'))
+        contains = wcs.footprint_contains(coords)
         x, y = wcs.world_to_pixel(coords)
         stars.add_column(Column(name='Catalog_X', data=x))
         stars.add_column(Column(name='Catalog_Y', data=y))
-        datamodel.stars[catalog] = stars
+
+        datamodel.stars[catalog] = stars[contains]
+        return stars
+    else:
+        return None
 
 
 # def get_Gaia(center_coord, radius):

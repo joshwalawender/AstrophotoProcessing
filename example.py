@@ -38,7 +38,7 @@ catalog = Gaia DR3
 GmagLimit = 15
 
 [Photometry]
-StarApertureRadius = 6
+StarApertureRadius = 9
 ''')
 #index-dir = /Volumes/Ohina2External/astrometry_data
 
@@ -59,12 +59,13 @@ if not working_file.exists():
     if image.center_coord is not None:
         print(image.center_coord.to_string('hmsdms', precision=1))
         print(image.radius)
-    query_vizier(image, cfg=cfg)
-    photometry(image, cfg=cfg)
+    full_catalog = query_vizier(image, cfg=cfg)
     image.write('test.fits')
 else:
     print('Loading Existing Image')
     image = OSCImage(working_file)
+
+photometry(image, cfg=cfg)
 
 overlay_stars(image, cfg=cfg)
 plot_zeropoints(image, cfg=cfg)
