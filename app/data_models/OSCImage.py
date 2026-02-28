@@ -333,15 +333,17 @@ class OSCImage(object):
     ## display
     ##-------------------------------------------------------------------------
     def ds9_set(self, cmd):
-        msg = {"samp.mtype": "ds9.set",
-               "samp.params":{"cmd": cmd}}
-        self.ds9.notify_all(msg)
+        if self.ds9:
+            msg = {"samp.mtype": "ds9.set",
+                   "samp.params":{"cmd": cmd}}
+            self.ds9.notify_all(msg)
 
 
     def ds9_get(self, cmd):
-        msg = {"samp.mtype": "ds9.get",
-               "samp.params":{"cmd": cmd}}
-        self.ds9.notify_all(msg)
+        if self.ds9:
+            msg = {"samp.mtype": "ds9.get",
+                   "samp.params":{"cmd": cmd}}
+            self.ds9.notify_all(msg)
 
 
 #     def display_using_set(self):
@@ -365,11 +367,12 @@ class OSCImage(object):
 
 
     def regions_from_catalog(self, catalog='Gaia DR3', radius=10):
-        xys = [PixCoord(x=star['Catalog_X'], y=star['Catalog_Y']) for star in self.stars.get(catalog, [])]
-        reglist = Regions([CirclePixelRegion(xy, radius) for xy in xys])
-        reglist.write('tmp.reg')
-        cmd = f'region load /Users/jwalawender/git/AstrophotoProcessing/tmp.reg'
-        self.ds9_set(cmd)
+        if self.ds9:
+            xys = [PixCoord(x=star['Catalog_X'], y=star['Catalog_Y']) for star in self.stars.get(catalog, [])]
+            reglist = Regions([CirclePixelRegion(xy, radius) for xy in xys])
+            reglist.write('tmp.reg')
+            cmd = f'region load /Users/jwalawender/git/AstrophotoProcessing/tmp.reg'
+            self.ds9_set(cmd)
 #         for star in self.stars.get(catalog, []):
 #             xy = PixCoord(x=star['Catalog_X'], y=star['Catalog_Y'])
 #             r = CirclePixelRegion(xy, radius)
