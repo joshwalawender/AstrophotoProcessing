@@ -61,10 +61,11 @@ if not working_file.exists():
     bias_subtract(image, master_bias=OSCImage(master_bias_file))
     solve_field(image, cfg=cfg)
     full_catalog = query_vizier(image, cfg=cfg)
-    photometry(image, cfg=cfg)
     image.write(working_file)
 else:
     image = OSCImage(working_file)
+
+photometry(image, cfg=cfg)
 
 image.ds9_set('frame 1')
 image.display()

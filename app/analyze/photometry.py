@@ -87,5 +87,13 @@ def photometry(DM, cfg=None):
         log.info(f"  Found {np.sum(outliers)} outlier zero points")
         stars.add_column(Column(name=f'{color}Outliers', data=outliers))
 
+        # Estimate Sky Brightness
+        sky_mean_values = stars[f'{color}SkyMean'][stars[f'{color}Photometry']]
+        Msky = -2.5*np.log10(sky_mean_values) + zp_median
+        Msky_mean, Msky_median, Msky_stddev = stats.sigma_clipped_stats(Msky)
+        DM.sky_brightness[color] = Msky_median
+        DM.sky_brightness_stddev[color] = Msky_stddev
+        log.info(f'  Typical Sky Brightness for {color} = {Msky_median:.2f} mag (stddev = {Msky_stddev:.2f} mag)')
+
     DM.stars[catalog] = stars
     

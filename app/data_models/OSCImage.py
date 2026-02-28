@@ -39,6 +39,8 @@ class OSCImage(object):
         self.hdu_names = [hdu.name for hdu in self.hdulist]
         self.zero_point = {}
         self.zero_point_stddev = {}
+        self.sky_brightness = {}
+        self.sky_brightness_stddev = {}
         self.fwhm = None
         self.fwhm_stddev = None
         self.tempdir = Path(tempfile.mkdtemp())
@@ -99,11 +101,13 @@ class OSCImage(object):
             # Read in Zero Point Values
             for color in ['R', 'G', 'B']:
                 hdr_zp = self.hdulist[processed].header.get(f'{color}ZEROPNT', None)
-                if hdr_zp:
-                    self.zero_point[color] = float(hdr_zp)
+                if hdr_zp: self.zero_point[color] = float(hdr_zp)
                 hdr_zp_std = self.hdulist[processed].header.get(f'{color}ZPSTD', None)
-                if hdr_zp_std:
-                    self.zero_point_stddev[color] = float(hdr_zp_std)
+                if hdr_zp_std: self.zero_point_stddev[color] = float(hdr_zp_std)
+                hdr_sb = self.hdulist[processed].header.get(f'{color}MSKY', None)
+                if hdr_sb: self.sky_brightness[color] = float(hdr_sb)
+                hdr_sb_std = self.hdulist[processed].header.get(f'{color}MSKYSTD', None)
+                if hdr_sb_std: self.sky_brightness_stddev[color] = float(hdr_sb_std)
 
             # Read in FWHM Values
             hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
@@ -232,6 +236,11 @@ class OSCImage(object):
                                           f'Calculated Zero Point ({color})')
             self.hdulist[pind].header.set(f'{color}ZPSTD', f'{self.zero_point_stddev.get(color):.3f}',
                                           f'Calculated Zero Point Std Dev ({color})')
+        for color in self.sky_brightness.keys():
+            self.hdulist[pind].header.set(f'{color}MSKY', f'{self.sky_brightness.get(color):.3f}',
+                                          f'Sky Brigtness ({color}) [mag/arcsec^2]')
+            self.hdulist[pind].header.set(f'{color}MSKYSTD', f'{self.sky_brightness_stddev.get(color):.3f}',
+                                          f'Sky Brigtness Std Dev ({color}) [mag/arcsec^2]')
         if self.fwhm:
             self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
                                           'Typical FWHM')
