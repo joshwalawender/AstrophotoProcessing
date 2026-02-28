@@ -12,7 +12,9 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord, ICRS
 from astropy import wcs
 from astropy import visualization as vis
+from astropy import samp
 import ccdproc
+from regions import Regions, PixCoord, CirclePixelRegion
 
 from matplotlib import pyplot as plt
 
@@ -99,7 +101,7 @@ class OSCImage(object):
                 hdr_zp = self.hdulist[processed].header.get(f'{color}ZEROPNT', None)
                 if hdr_zp:
                     self.zero_point[color] = float(hdr_zp)
-                hdr_zp_std = self.hdulist[processed].header.get('ZPSTDDEV', None)
+                hdr_zp_std = self.hdulist[processed].header.get(f'{color}ZPSTD', None)
                 if hdr_zp_std:
                     self.zero_point_stddev[color] = float(hdr_zp_std)
 
@@ -228,7 +230,7 @@ class OSCImage(object):
         for color in self.zero_point.keys():
             self.hdulist[pind].header.set(f'{color}ZEROPNT', f'{self.zero_point.get(color):.3f}',
                                           f'Calculated Zero Point ({color})')
-            self.hdulist[pind].header.set(f'{color}ZPSTDDEV', f'{self.zero_point_stddev.get(color):.3f}',
+            self.hdulist[pind].header.set(f'{color}ZPSTD', f'{self.zero_point_stddev.get(color):.3f}',
                                           f'Calculated Zero Point Std Dev ({color})')
         if self.fwhm:
             self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
@@ -325,3 +327,53 @@ class OSCImage(object):
         if jpeg_file.exists(): jpeg_file.unlink()
         log.info(f"Saving {str(jpeg_file)}")
         plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
+
+
+    ##-------------------------------------------------------------------------
+    ## display
+    ##-------------------------------------------------------------------------
+    def ds9_set(self, cmd):
+        msg = {"samp.mtype": "ds9.set",
+               "samp.params":{"cmd": cmd}}
+        self.ds9.notify_all(msg)
+
+
+    def ds9_get(self, cmd):
+        msg = {"samp.mtype": "ds9.get",
+               "samp.params":{"cmd": cmd}}
+        self.ds9.notify_all(msg)
+
+
+#     def display_using_set(self):
+#         if self.ds9:
+#             tempfile = self.write_tmp()
+#             x, y = self.data.shape
+#             self.ds9_set(f"array {str(tempfile)}[xdim={x:d},ydim={y:d},bitpix=-32]")
+#             tempfile.unlink()
+
+
+    def display(self):
+        if self.ds9:
+            tempfile = self.write_tmp()
+            x, y = self.data.shape
+            cmd = f"array {str(tempfile)}[xdim={x:d},ydim={y:d},bitpix=-32]"
+            fp = np.memmap(tempfile, dtype='float32', mode='w+', shape=self.data.shape)
+            fp[:] = np.array(self.data)[:]
+            fp.flush()
+            self.ds9.ecall_and_wait("c1", "ds9.set", "10", cmd=cmd)
+            tempfile.unlink()
+
+
+    def regions_from_catalog(self, catalog='Gaia DR3', radius=10):
+        xys = [PixCoord(x=star['Catalog_X'], y=star['Catalog_Y']) for star in self.stars.get(catalog, [])]
+        reglist = Regions([CirclePixelRegion(xy, radius) for xy in xys])
+        reglist.write('tmp.reg')
+        cmd = f'region load /Users/jwalawender/git/AstrophotoProcessing/tmp.reg'
+        self.ds9_set(cmd)
+#         for star in self.stars.get(catalog, []):
+#             xy = PixCoord(x=star['Catalog_X'], y=star['Catalog_Y'])
+#             r = CirclePixelRegion(xy, radius)
+#             rstr = r.serialize(format='ds9')
+#             rline = rstr.strip().split('\n')[-1]
+#             cmd = f'region command "{rline}"'
+#             self.ds9_set(cmd)
