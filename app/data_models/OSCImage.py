@@ -357,20 +357,23 @@ class OSCImage(object):
 
 #     def display_using_set(self):
 #         if self.ds9:
-#             tempfile = self.write_tmp()
+#             tempfile = self.tempdir / 'app_temp_image.fits'
 #             x, y = self.data.shape
+#             fp = np.memmap(tempfile, dtype='float32', mode='w+', shape=self.data.shape)
+#             fp[:] = np.array(self.data)[:]
+#             fp.flush()
 #             self.ds9_set(f"array {str(tempfile)}[xdim={x:d},ydim={y:d},bitpix=-32]")
 #             tempfile.unlink()
 
 
     def display(self):
         if self.ds9:
-            tempfile = self.write_tmp()
+            tempfile = self.tempdir / 'app_temp_image.fits'
             x, y = self.data.shape
-            cmd = f"array {str(tempfile)}[xdim={x:d},ydim={y:d},bitpix=-32]"
             fp = np.memmap(tempfile, dtype='float32', mode='w+', shape=self.data.shape)
             fp[:] = np.array(self.data)[:]
             fp.flush()
+            cmd = f"array {str(tempfile)}[xdim={x:d},ydim={y:d},bitpix=-32]"
             self.ds9.ecall_and_wait("c1", "ds9.set", "10", cmd=cmd)
             tempfile.unlink()
 
