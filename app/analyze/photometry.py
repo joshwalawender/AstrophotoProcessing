@@ -12,20 +12,20 @@ from app import log
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def photometry(datamodel, cfg=None):
+def photometry(DM, cfg=None):
     '''
     '''
     catalog = cfg['Catalog'].get('catalog')
     star_r = cfg['Photometry'].getfloat('StarApertureRadius')
-    stars = datamodel.stars.get(catalog, [])
+    stars = DM.stars.get(catalog, [])
 
     positions = [p for p in zip(stars['Catalog_X'], stars['Catalog_Y'])]
     apertures = aperture.CircularAperture(positions, star_r)
     sky_apertures = aperture.CircularAnnulus(positions, 2*star_r, 3*star_r)
     # Generate Background Subtracted Image for ApertureStats
-    image = u.Quantity(np.array(datamodel.data))
-    scaled_image = u.Quantity(np.array(datamodel.data))/datamodel.exptime
-    backsub_image = u.Quantity(np.array(datamodel.data) - np.median(datamodel.data))
+    image = u.Quantity(np.array(DM.data))
+    scaled_image = u.Quantity(np.array(DM.data))/DM.exptime
+    backsub_image = u.Quantity(np.array(DM.data) - np.median(DM.data))
     ## Centroid stars and determine FWHM
     log.info(f'Centroiding catalog stars')
     apstats = aperture.ApertureStats(image, apertures)
@@ -41,21 +41,21 @@ def photometry(datamodel, cfg=None):
     # Record Typical FWHM
     fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
     fwhm_mean, fwhm_median, fwhm_stddev = stats.sigma_clipped_stats(fwhm_values)
-    datamodel.fwhm = fwhm_median
-    datamodel.fwhm_stddev = fwhm_stddev
+    DM.fwhm = fwhm_median
+    DM.fwhm_stddev = fwhm_stddev
     log.info(f'  Typical FWHM = {fwhm_median:.1f} pix (stddev = {fwhm_stddev:.1f} pix)')
 
     ## Perform aperture photometry on stars
     for color in ['R', 'G', 'B']:
         log.info(f'Performing {color} aperture photometry on catalog stars')
         star_area = apertures.area_overlap(scaled_image,
-                                           mask=datamodel.mask[color])
+                                           mask=DM.mask[color])
         star, errs = apertures.do_photometry(scaled_image,
-                                             mask=datamodel.mask[color])
+                                             mask=DM.mask[color])
         sky_area = sky_apertures.area_overlap(scaled_image,
-                                              mask=datamodel.mask[color])
+                                              mask=DM.mask[color])
         sky, sky_errs = sky_apertures.do_photometry(scaled_image,
-                                                    mask=datamodel.mask[color])
+                                                    mask=DM.mask[color])
         stars.add_column(Column(name=f'{color}StarArea', data=star_area))
         stars.add_column(Column(name=f'{color}StarSum', data=star))
         stars.add_column(Column(name=f'{color}SkyArea', data=sky_area))
@@ -78,8 +78,8 @@ def photometry(datamodel, cfg=None):
         # Record Typical ZeroPoint
         zp_values = stars[f'{color}ZeroPoint'][stars[f'{color}Photometry']]
         zp_mean, zp_median, zp_stddev = stats.sigma_clipped_stats(zp_values)
-        datamodel.zero_point[color] = zp_median
-        datamodel.zero_point_stddev[color] = zp_stddev
+        DM.zero_point[color] = zp_median
+        DM.zero_point_stddev[color] = zp_stddev
         log.info(f'  Typical Zero Point for {color} = {zp_median:.2f} mag (stddev = {zp_stddev:.2f} mag)')
 
         # Look at Zero Point statistics and flag outlier stars
@@ -87,5 +87,5 @@ def photometry(datamodel, cfg=None):
         log.info(f"  Found {np.sum(outliers)} outlier zero points")
         stars.add_column(Column(name=f'{color}Outliers', data=outliers))
 
-    datamodel.stars[catalog] = stars
+    DM.stars[catalog] = stars
     

@@ -11,7 +11,7 @@ from app import log
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def query_vizier(datamodel, cfg=None):
+def query_vizier(DM, cfg=None):
     catalog = cfg['Catalog'].get('catalog')
     Gmag_limit = cfg['Catalog'].getfloat('GmagLimit')
     Vizier_name = {'Gaia DR3': 'I/355/gaiadr3'}
@@ -20,13 +20,13 @@ def query_vizier(datamodel, cfg=None):
     vizier = Vizier(column_filters={"Gmag":f"<{Gmag_limit:.1f}"})
     vizier.ROW_LIMIT = 10000
     log.info(f'Querying Vizier for {catalog} stars')
-    r = vizier.query_region(datamodel.center_coord,
-                            radius=datamodel.radius*u.deg,
+    r = vizier.query_region(DM.center_coord,
+                            radius=DM.radius*u.deg,
                             catalog=Vizier_name[catalog])
     assert len(r) > 0
     stars = r[0]
     if len(stars) > 0:
-        wcs = datamodel.get_wcs()
+        wcs = DM.get_wcs()
         coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                           unit=(u.deg, u.deg),
                           obstime=Time(2000, format='decimalyear'))
@@ -38,7 +38,7 @@ def query_vizier(datamodel, cfg=None):
         log.info(f'  Retrieved {len(stars)} catalog stars in area')
         log.info(f'  Image contains {len(stars[contains])} stars')
 
-        datamodel.stars[catalog] = stars[contains]
+        DM.stars[catalog] = stars[contains]
         return stars
     else:
         return None

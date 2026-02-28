@@ -13,8 +13,8 @@ from app.data_models.OSCImage import OSCImage
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def solve_field(datamodel, cfg={}, center_coord=None):
-    assert isinstance(datamodel, OSCImage)
+def solve_field(DM, cfg={}, center_coord=None):
+    assert isinstance(DM, OSCImage)
 
     cmd = [cfg['Astrometry.net'].get('solve-field','solve-field')]
     cmd.extend(['-p', '-O'])
@@ -43,7 +43,7 @@ def solve_field(datamodel, cfg={}, center_coord=None):
         cmd.extend(['-5', f'0.1'])
 
     # run astrometry.net on the temporary fits file
-    tfile = datamodel.write_tmp()
+    tfile = DM.write_tmp()
     tfolder = tfile.parent
     cmd.append(str(tfile))
     log.info('Running Astrometry.net')
@@ -66,13 +66,13 @@ def solve_field(datamodel, cfg={}, center_coord=None):
         new_wcs = wcs.WCS(str(wcs_file))
         new_header = new_wcs.to_header(relax=True)
         # Update data model
-        datamodel.update_data(None,
+        DM.update_data(None,
                               header=new_header.cards,
                               history=['WCS solved by astrometry.net'])
         # Calculate and return center coordinate and field radius
-        center_coord = new_wcs.pixel_to_world(datamodel.data.shape[0]/2, datamodel.data.shape[1]/2)
+        center_coord = new_wcs.pixel_to_world(DM.data.shape[0]/2, DM.data.shape[1]/2)
         center_coord_str = center_coord.to_string("hmsdms", sep=":", precision=1)
-        fp = new_wcs.calc_footprint(axes=datamodel.data.shape)
+        fp = new_wcs.calc_footprint(axes=DM.data.shape)
         dra = fp[:,0].max() - fp[:,0].min()
         ddec = fp[:,1].max() - fp[:,1].min()
         radius = np.sqrt((dra*np.cos(fp[:,1].mean()*np.pi/180.))**2 + ddec**2)/2.
@@ -81,6 +81,6 @@ def solve_field(datamodel, cfg={}, center_coord=None):
         f.unlink()
     log.info(f'  Central Coordinate: {center_coord_str}')
     log.info(f'  FoV radius: {radius:.1f} deg')
-    datamodel.center_coord = center_coord
-    datamodel.radius = radius
+    DM.center_coord = center_coord
+    DM.radius = radius
 
