@@ -51,7 +51,7 @@ SaturationThreshold = 60000
 ## Example Reduction
 ##-------------------------------------------------------------------------
 # raw_file = '/Volumes/SmartEyeData/SmartEye_2026-02-05/Raw/exp_000187_0005_0011_30sec_0C.fit'
-raw_file = '~/git/AstrophotoProcessing/exp_000187_0005_0011_30sec_0C.fit'
+raw_file = '~/git/AstrophotoProcessing/test_raw.fits'
 master_bias_file = '~/git/AstrophotoProcessing/StackDark_00C_30_350.fit'
 working_file = Path('~/git/AstrophotoProcessing/test.fits').expanduser()
 catalog = cfg['Catalog'].get('catalog')
@@ -67,11 +67,11 @@ else:
 
 photometry(image, cfg=cfg)
 
-image.ds9_set('frame 1')
-image.display()
-image.ds9_set('scale log exp 100')
-image.ds9_set('zoom to fit')
-image.regions_from_catalog()
+# image.ds9_set('frame 1')
+# image.display()
+# image.ds9_set('scale log exp 100')
+# image.ds9_set('zoom to fit')
+# image.regions_from_catalog()
 
 # image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
 # plot_zeropoints(image, cfg=cfg)
