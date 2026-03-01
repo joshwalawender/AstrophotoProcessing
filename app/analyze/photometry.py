@@ -88,9 +88,12 @@ def photometry(DM, cfg=None):
         stars.add_column(Column(name=f'{color}Outliers', data=outliers))
 
         # Estimate Sky Brightness
-        sky_mean_values = stars[f'{color}SkyMean'][stars[f'{color}Photometry']]
+        wcs = DM.get_wcs()
+        area_of_pixel = wcs.proj_plane_pixel_area().to(u.arcsec**2).value
+        sky_mean_values = stars[f'{color}SkyMean']/area_of_pixel
         Msky = -2.5*np.log10(sky_mean_values) + zp_median
-        Msky_mean, Msky_median, Msky_stddev = stats.sigma_clipped_stats(Msky)
+        stars.add_column(Column(name=f'{color}SkyMag', data=Msky))
+        Msky_mean, Msky_median, Msky_stddev = stats.sigma_clipped_stats(Msky[stars[f'{color}Photometry']])
         DM.sky_brightness[color] = Msky_median
         DM.sky_brightness_stddev[color] = Msky_stddev
         log.info(f'  Typical Sky Brightness for {color} = {Msky_median:.2f} mag (stddev = {Msky_stddev:.2f} mag)')

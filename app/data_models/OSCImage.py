@@ -73,6 +73,7 @@ class OSCImage(object):
                                 unit='adu',
                                 )
             self.build_color_mask()
+            self.split_colors()
             self.center_coord = None
             self.radius = None
         else:
@@ -97,6 +98,15 @@ class OSCImage(object):
             else:
                 self.radius = None
             self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
+
+            # Read in Individual Color Images
+            for color in ['Red', 'Green', 'Blue']:
+                ind = self.getHDU(color)
+                data = CCDData(data=self.hdulist[ind].data,
+                               meta={'APP_DM': 'OSCImage', 'COLOR': color},
+                               unit='adu',
+                               )
+                setattr(self, color.lower(), data)
 
             # Read in Zero Point Values
             for color in ['R', 'G', 'B']:
@@ -248,14 +258,14 @@ class OSCImage(object):
                                           'FWHM Std Dev')
 
         # Three Colors
-#         for color in ['RED', 'GREEN', 'BLUE']:
-#             cind = self.getHDU(color)
-#             chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
-#             chdu.header.set('EXTNAME', color)
-#             if cind == -1:
-#                 self.hdulist.append(chdu)
-#             else:
-#                 self.hdulist[cind] = chdu
+        for color in ['Red', 'Green', 'Blue']:
+            cind = self.getHDU(color)
+            chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
+            chdu.header.set('EXTNAME', color)
+            if cind == -1:
+                self.hdulist.append(chdu)
+            else:
+                self.hdulist[cind] = chdu
 
         # Write Catalog Stars to FITS Table
         for catalog in self.stars.keys():

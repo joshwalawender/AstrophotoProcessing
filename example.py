@@ -11,6 +11,7 @@ from app.analyze.run_astrometrydotnet import solve_field
 from app.analyze.get_catalog import query_vizier
 from app.analyze.photometry import photometry
 from app.plots.plot_zeropoints import plot_zeropoints
+from app.plots.plot_skybrightness import plot_skybrightness
 
 
 ##-------------------------------------------------------------------------
@@ -51,9 +52,9 @@ SaturationThreshold = 60000
 ## Example Reduction
 ##-------------------------------------------------------------------------
 # raw_file = '/Volumes/SmartEyeData/SmartEye_2026-02-05/Raw/exp_000187_0005_0011_30sec_0C.fit'
-raw_file = '~/git/AstrophotoProcessing/test_raw.fits'
+raw_file = Path('~/git/AstrophotoProcessing/raw.fits').expanduser()
+working_file = Path('~/git/AstrophotoProcessing/final.fits').expanduser()
 master_bias_file = '~/git/AstrophotoProcessing/StackDark_00C_30_350.fit'
-working_file = Path('~/git/AstrophotoProcessing/test.fits').expanduser()
 catalog = cfg['Catalog'].get('catalog')
 
 if not working_file.exists():
@@ -61,11 +62,14 @@ if not working_file.exists():
     bias_subtract(image, master_bias=OSCImage(master_bias_file))
     solve_field(image, cfg=cfg)
     full_catalog = query_vizier(image, cfg=cfg)
+    photometry(image, cfg=cfg)
     image.write(working_file)
 else:
     image = OSCImage(working_file)
 
-photometry(image, cfg=cfg)
+image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
+plot_zeropoints(image, cfg=cfg)
+plot_skybrightness(image, cfg=cfg)
 
 # image.ds9_set('frame 1')
 # image.display()
@@ -73,5 +77,3 @@ photometry(image, cfg=cfg)
 # image.ds9_set('zoom to fit')
 # image.regions_from_catalog()
 
-# image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
-# plot_zeropoints(image, cfg=cfg)
