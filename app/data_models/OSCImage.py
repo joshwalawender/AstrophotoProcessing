@@ -14,7 +14,7 @@ from astropy import wcs
 from astropy import visualization as vis
 from astropy import samp
 import ccdproc
-from regions import Regions, PixCoord, CirclePixelRegion
+# from regions import Regions, PixCoord, CirclePixelRegion
 
 from matplotlib import pyplot as plt
 
@@ -388,13 +388,13 @@ class OSCImage(object):
             tempfile.unlink()
 
 
-    def regions_from_catalog(self, catalog='Gaia DR3', radius=10):
-        if self.ds9:
-            xys = [PixCoord(x=star['Catalog_X'], y=star['Catalog_Y']) for star in self.stars.get(catalog, [])]
-            reglist = Regions([CirclePixelRegion(xy, radius) for xy in xys])
-            reglist.write('tmp.reg')
-            cmd = f'region load /Users/jwalawender/git/AstrophotoProcessing/tmp.reg'
-            self.ds9_set(cmd)
+#     def regions_from_catalog(self, catalog='Gaia DR3', radius=10):
+#         if self.ds9:
+#             xys = [PixCoord(x=star['Catalog_X'], y=star['Catalog_Y']) for star in self.stars.get(catalog, [])]
+#             reglist = Regions([CirclePixelRegion(xy, radius) for xy in xys])
+#             reglist.write('tmp.reg')
+#             cmd = f'region load /Users/jwalawender/git/AstrophotoProcessing/tmp.reg'
+#             self.ds9_set(cmd)
 #         for star in self.stars.get(catalog, []):
 #             xy = PixCoord(x=star['Catalog_X'], y=star['Catalog_Y'])
 #             r = CirclePixelRegion(xy, radius)
