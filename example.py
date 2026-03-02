@@ -67,8 +67,8 @@ if not working_file.exists():
 else:
     image = OSCImage(working_file)
 
-image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
-plot_zeropoints(image, cfg=cfg)
+# image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
+# plot_zeropoints(image, cfg=cfg)
 plot_skybrightness(image, cfg=cfg)
 
 # image.ds9_set('frame 1')

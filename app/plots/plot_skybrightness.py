@@ -3,6 +3,7 @@
 from pathlib import Path
 import numpy as np
 import scipy
+from astropy import units as u
 from astropy.nddata import CCDData, block_reduce
 from astropy import visualization as vis
 from matplotlib import pyplot as plt
@@ -48,16 +49,27 @@ def plot_skybrightness(DM, cfg=None):
         if c == 2: plt.xlabel('Sky Brightness (mag)')
 
         plt.subplot(3,2,2*c+2)
-        color_data = getattr(DM, plot_colors[color])
-        medfilt_im = scipy.ndimage.median_filter(color_data, size=3*star_size)
-        medfilt_im = block_reduce(data=medfilt_im, block_size=30, func=np.nanmean)
-        sb_im = -2.5*np.log10(medfilt_im) + DM.zero_point[color]
-        norm = vis.ImageNormalize(sb_im,
-                                  interval=vis.AsymmetricPercentileInterval(1, 99.99),
-                                  stretch=vis.LinearStretch())
-        plt.imshow(medfilt_im, cmap=plt.cm.gray, norm=norm)
-        plt.xlim(0,medfilt_im.shape[1])
-        plt.ylim(0,medfilt_im.shape[0])
+        wcs = DM.get_wcs()
+        area_of_pixel = wcs.proj_plane_pixel_area().to(u.arcsec**2).value
+        color_data = np.array(getattr(DM, plot_colors[color]))/DM.exptime
+        log.debug(f'median_filter {color}')
+        im_medfilt = scipy.ndimage.median_filter(color_data, size=3*star_size)
+        log.debug(f'block_reduce {color}')
+        block_size = 200
+        im_block_reduced = block_reduce(data=im_medfilt, block_size=block_size, func=np.nanmedian)
+        log.debug(f'calulate mag/sq_arcsec {color}')
+        im_sb = -2.5*np.log10(im_block_reduced/area_of_pixel) + DM.zero_point[color]
+        norm = vis.ImageNormalize(im_sb,
+                                  interval=vis.AsymmetricPercentileInterval(1, 99),
+                                  stretch=vis.LogStretch())
+        log.debug(f'imshow {color}')
+        plt.imshow(im_sb, cmap=plt.cm.gray, norm=norm)
+        log.debug(f'overlay text values {color}')
+        for x in np.arange(0,im_sb.shape[1]):
+            for y in np.arange(0,im_sb.shape[0]):
+                plt.text(x, y, f"{im_sb[y,x]:.2f}", color='g', size=4)
+        plt.xlim(0,im_sb.shape[1])
+        plt.ylim(0,im_sb.shape[0])
         plt.xticks([])
         plt.yticks([])
 

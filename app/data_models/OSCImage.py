@@ -185,7 +185,7 @@ class OSCImage(object):
         # Image Data
         if isinstance(newdata, CCDData):
             self.data = newdata
-#             self.split_colors()
+            self.split_colors()
         # Header
         pind = self.getHDU('PROCESSED')
         for h in header:
