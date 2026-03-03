@@ -22,10 +22,12 @@ def photometry(DM, cfg=None):
     positions = [p for p in zip(stars['Catalog_X'], stars['Catalog_Y'])]
     apertures = aperture.CircularAperture(positions, star_r)
     sky_apertures = aperture.CircularAnnulus(positions, 2*star_r, 3*star_r)
+
     # Generate Background Subtracted Image for ApertureStats
     image = u.Quantity(np.array(DM.data))
     scaled_image = u.Quantity(np.array(DM.data))/DM.exptime
     backsub_image = u.Quantity(np.array(DM.data) - np.median(DM.data))
+
     ## Centroid stars and determine FWHM
     log.info(f'Centroiding catalog stars')
     apstats = aperture.ApertureStats(image, apertures)
@@ -38,12 +40,29 @@ def photometry(DM, cfg=None):
     for p in aperture_properties:
         stars.add_column(Column(name=p[0], data=getattr(apstats, p[1])))
 
+    # Evaluate WCS from Centroid Offsets
+    deltaX = stars['Catalog_X'] - stars['Centroid_X']
+    stars.add_column(Column(name='WCSOffsetX', data=deltaX))
+    deltaY = stars['Catalog_Y'] - stars['Centroid_Y']
+    stars.add_column(Column(name='WCSOffsetY', data=deltaY))
+    deltaR = (deltaX**2+deltaY**2)**0.5
+    stars.add_column(Column(name='WCSOffsetR', data=deltaR))
+#     DM.WCS_offset_RMS_X = np.mean(stars['WCSOffsetX']**2)**0.5
+#     DM.WCS_offset_RMS_Y = np.mean(stars['WCSOffsetY']**2)**0.5
+    DM.WCS_median_offset = np.median(stars['WCSOffsetR'])
+    log.info(f'WCS Median Offset = {DM.WCS_median_offset:.2f} pix')
+
     # Record Typical FWHM
     fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
     fwhm_mean, fwhm_median, fwhm_stddev = stats.sigma_clipped_stats(fwhm_values)
     DM.fwhm = fwhm_median
     DM.fwhm_stddev = fwhm_stddev
     log.info(f'  Typical FWHM = {fwhm_median:.1f} pix (stddev = {fwhm_stddev:.1f} pix)')
+    elng_values = stars['elongation'][~np.isnan(stars['elongation'])]
+    elng_mean, elng_median, elng_stddev = stats.sigma_clipped_stats(elng_values)
+    DM.elongation = elng_median
+    DM.elongation_stddev = elng_stddev
+    log.info(f'  Typical elongation = {elng_median:.1f} (stddev = {elng_stddev:.1f})')
 
     ## Perform aperture photometry on stars
     for color in ['R', 'G', 'B']:
@@ -65,11 +84,14 @@ def photometry(DM, cfg=None):
         # Calculate Zero Point Values
         flux = stars[f'{color}StarSum'] - stars[f'{color}StarArea']*stars[f'{color}SkyMean']
         stars.add_column(Column(name=f'{color}StarFlux', data=flux))
+        positive_sky = (stars[f'{color}SkyMean'] > 0)
+        positive_flux = (stars[f'{color}StarFlux'] > 0)
         has_flux = ~np.isnan(stars[f'{color}StarFlux'])
         not_saturated = stars['peak_value'] < float(cfg['Photometry'].get('SaturationThreshold', 60000))
-        good_photometry = has_flux & not_saturated
+        good_photometry = positive_sky & positive_flux & has_flux & not_saturated
         stars.add_column(Column(name=f'{color}Photometry', data=good_photometry))
-        instmag = -2.5*np.log10(flux)
+        instmag = [-2.5*np.log10(s[f'{color}StarFlux'])\
+                   if s[f'{color}Photometry'] else np.nan for s in stars]
         stars.add_column(Column(name=f'{color}InstMag', data=instmag))
         catalog_mag_name = cfg['Catalog'].get(f'{color}mag')
         zp = stars[catalog_mag_name] - stars[f'{color}InstMag']
@@ -84,7 +106,7 @@ def photometry(DM, cfg=None):
 
         # Look at Zero Point statistics and flag outlier stars
         outliers = abs(stars[f'{color}ZeroPoint']-zp_median) > 5*zp_stddev
-        log.info(f"  Found {np.sum(outliers)} outlier zero points")
+        log.debug(f"  Found {np.sum(outliers)} outlier zero points")
         stars.add_column(Column(name=f'{color}Outliers', data=outliers))
 
         # Estimate Sky Brightness

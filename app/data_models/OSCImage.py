@@ -7,6 +7,11 @@ import datetime
 import numpy as np
 from astropy import units as u
 from astropy.io import fits
+
+from astropy.io.fits.verify import VerifyWarning
+import warnings
+warnings.simplefilter('ignore', category=VerifyWarning)
+
 from astropy.nddata import CCDData, block_reduce
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, ICRS
@@ -29,7 +34,7 @@ class OSCImage(object):
             hdulist = hdulist.expanduser().absolute()
             assert hdulist.exists()
             self.raw_file_name = hdulist.name
-            log.info(f'Instantiating data model from {self.raw_file_name}')
+            log.debug(f'Instantiating data model from {self.raw_file_name}')
             hdulist = fits.open(hdulist)
         else:
             print(f"HDUList input {type(hdulist)} is unknown")
@@ -37,20 +42,29 @@ class OSCImage(object):
         self.hdulist = hdulist
         self.hdulist.verify("fix")
         self.hdu_names = [hdu.name for hdu in self.hdulist]
+        self.WCS_median_offset = None
+        self.fwhm = None
+        self.fwhm_stddev = None
+        self.elongation = None
+        self.elongation_stddev = None
         self.zero_point = {}
         self.zero_point_stddev = {}
         self.sky_brightness = {}
         self.sky_brightness_stddev = {}
-        self.fwhm = None
-        self.fwhm_stddev = None
+        self.reference = None
+        self.background_offset = {}
+        self.flux_scaling = {}
         self.tempdir = Path(tempfile.mkdtemp())
 
         # Connect to ds9 via SAMP
         try:
             self.ds9 = samp.SAMPIntegratedClient()
             self.ds9.connect()
+        except samp.errors.SAMPHubError as e:
+            self.ds9 = None
         except Exception as e:
             print('Unable to connect to ds9')
+            print(type(e))
             print(e)
             self.ds9 = None
 
@@ -73,7 +87,6 @@ class OSCImage(object):
                                 unit='adu',
                                 )
             self.build_color_mask()
-            self.split_colors()
             self.center_coord = None
             self.radius = None
         else:
@@ -99,14 +112,34 @@ class OSCImage(object):
                 self.radius = None
             self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
 
+            
             # Read in Individual Color Images
-            for color in ['Red', 'Green', 'Blue']:
-                ind = self.getHDU(color)
-                data = CCDData(data=self.hdulist[ind].data,
-                               meta={'APP_DM': 'OSCImage', 'COLOR': color},
-                               unit='adu',
-                               )
-                setattr(self, color.lower(), data)
+#             for color in ['Red', 'Green', 'Blue']:
+#                 ind = self.getHDU(color)
+#                 data = CCDData(data=self.hdulist[ind].data,
+#                                meta={'APP_DM': 'OSCImage', 'COLOR': color},
+#                                unit='adu',
+#                                )
+#                 setattr(self, color.lower(), data)
+
+            # Read in FWHM Values
+            hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
+            self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
+            hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
+            self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
+            # Read in elongation Values
+            hdr_elng = self.hdulist[processed].header.get('ELNG', None)
+            self.elongation = float(hdr_elng) if hdr_elng is not None else None
+            hdr_elng_std = self.hdulist[processed].header.get('ELNGSTD', None)
+            self.elongation_stddev = float(hdr_elng_std) if hdr_elng_std is not None else None
+
+            # Read in WCS Offset Value
+            hdr_WCS_median_offset = self.hdulist[processed].header.get('WCSOFFST', None)
+            self.WCS_median_offset = float(hdr_WCS_median_offset) if hdr_WCS_median_offset is not None else None
+
+            # Read in Photometry Reference Comparison Values
+            hdr_ref = self.hdulist[processed].header.get('PHOTREF', None)
+            self.reference = hdr_ref if hdr_ref is not None else None
 
             # Read in Zero Point Values
             for color in ['R', 'G', 'B']:
@@ -118,12 +151,13 @@ class OSCImage(object):
                 if hdr_sb: self.sky_brightness[color] = float(hdr_sb)
                 hdr_sb_std = self.hdulist[processed].header.get(f'{color}MSKYSTD', None)
                 if hdr_sb_std: self.sky_brightness_stddev[color] = float(hdr_sb_std)
+                hdr_bo = self.hdulist[processed].header.get(f'{color}SKYOFF', None)
+                if hdr_bo: self.background_offset[color] = float(hdr_bo)
+                hdr_fs = self.hdulist[processed].header.get(f'{color}FLUXSCL', None)
+                if hdr_fs: self.flux_scaling[color] = float(hdr_fs)
 
-            # Read in FWHM Values
-            hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
-            self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
-            hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
-            self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
+
+        self.split_colors()
 
         # Build Catalogs
         if 'Gaia DR3' not in self.hdu_names:
@@ -241,6 +275,21 @@ class OSCImage(object):
                                       'Radius encompassing FoV [degrees]')
         self.hdulist[pind].header.set('RAWNAME', str(self.raw_file_name),
                                       'Original (raw) file name')
+
+
+        if self.WCS_median_offset:
+            self.hdulist[pind].header.set('WCSOFFST', f'{self.WCS_median_offset:.2f}',
+                                          'Median Offset from WCS [pix]')
+        if self.fwhm:
+            self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
+                                          'Typical FWHM')
+            self.hdulist[pind].header.set('FWHMSTD', f'{self.fwhm_stddev:.2f}',
+                                          'FWHM Std Dev')
+        if self.elongation:
+            self.hdulist[pind].header.set('ELNG', f'{self.elongation:.2f}',
+                                          'Typical elongation')
+            self.hdulist[pind].header.set('ELNGSTD', f'{self.elongation_stddev:.2f}',
+                                          'elongation Std Dev')
         for color in self.zero_point.keys():
             self.hdulist[pind].header.set(f'{color}ZEROPNT', f'{self.zero_point.get(color):.3f}',
                                           f'Calculated Zero Point ({color})')
@@ -251,21 +300,24 @@ class OSCImage(object):
                                           f'Sky Brigtness ({color}) [mag/arcsec^2]')
             self.hdulist[pind].header.set(f'{color}MSKYSTD', f'{self.sky_brightness_stddev.get(color):.3f}',
                                           f'Sky Brigtness Std Dev ({color}) [mag/arcsec^2]')
-        if self.fwhm:
-            self.hdulist[pind].header.set('FWHM', f'{self.fwhm:.2f}',
-                                          'Typical FWHM')
-            self.hdulist[pind].header.set('FWHMSTD', f'{self.fwhm_stddev:.2f}',
-                                          'FWHM Std Dev')
+        if self.reference:
+            self.hdulist[pind].header.set('PHOTREF', self.reference,
+                                          'Reference for photometry comparison (cSKYOFF, cFLUXSCL)')
+        for color in self.background_offset.keys():
+            self.hdulist[pind].header.set(f'{color}SKYOFF', f'{self.background_offset.get(color):.3f}',
+                                          f'Sky Brigtness Offset ({color}) [ADU]]')
+            self.hdulist[pind].header.set(f'{color}FLUXSCL', f'{self.flux_scaling.get(color):.3f}',
+                                          f'Flux Scaling Factor ({color})')
 
         # Three Colors
-        for color in ['Red', 'Green', 'Blue']:
-            cind = self.getHDU(color)
-            chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
-            chdu.header.set('EXTNAME', color)
-            if cind == -1:
-                self.hdulist.append(chdu)
-            else:
-                self.hdulist[cind] = chdu
+#         for color in ['Red', 'Green', 'Blue']:
+#             cind = self.getHDU(color)
+#             chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
+#             chdu.header.set('EXTNAME', color)
+#             if cind == -1:
+#                 self.hdulist.append(chdu)
+#             else:
+#                 self.hdulist[cind] = chdu
 
         # Write Catalog Stars to FITS Table
         for catalog in self.stars.keys():
@@ -283,7 +335,7 @@ class OSCImage(object):
     ##-------------------------------------------------------------------------
     ## write_jpg
     ##-------------------------------------------------------------------------
-    def write_jpg(self, radius=8):
+    def write_jpg(self, output=None, radius=8):
         '''Take the catalog stars and WCS and generate a PNG file 
         '''
         log.info('Generating JPG image')
@@ -341,8 +393,13 @@ class OSCImage(object):
             plt.gca().add_artist(c)
 
         # Save JPEG
-        ext = Path(self.raw_file_name).suffix
-        jpeg_file = Path(self.raw_file_name.replace(ext, '.jpg'))
+        rawext = Path(self.raw_file_name).suffix
+        if output is None:
+            jpeg_file = Path(self.raw_file_name.replace(rawext, '.jpg'))
+        elif Path(output).is_dir():
+            jpeg_file = Path(output).expanduser() / self.raw_file_name.replace(rawext, '.jpg')
+        else:
+            jpeg_file = Path(output).expanduser()
         if jpeg_file.exists(): jpeg_file.unlink()
         log.info(f"Saving {str(jpeg_file)}")
         plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)

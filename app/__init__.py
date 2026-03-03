@@ -7,7 +7,7 @@ log = logging.getLogger('AstrophotoProcessing')
 log.setLevel(logging.DEBUG)
 ## Set up console output
 LogConsoleHandler = logging.StreamHandler()
-LogConsoleHandler.setLevel(logging.DEBUG)
+LogConsoleHandler.setLevel(logging.INFO)
 LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s',
                               datefmt='%Y-%m-%d %H:%M:%S')
 LogConsoleHandler.setFormatter(LogFormat)

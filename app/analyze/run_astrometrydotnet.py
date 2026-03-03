@@ -40,7 +40,7 @@ def solve_field(DM, cfg={}, center_coord=None):
     if center_coord is not None:
         cmd.extend(['-3', f'{center_coord.ra.deg:.3f}'])
         cmd.extend(['-4', f'{center_coord.dec.deg:.3f}'])
-        cmd.extend(['-5', f'0.1'])
+        cmd.extend(['-5', f'0.25'])
 
     # run astrometry.net on the temporary fits file
     tfile = DM.write_tmp()
@@ -59,16 +59,17 @@ def solve_field(DM, cfg={}, center_coord=None):
     temp_contents = [f for f in tfolder.glob('*')]
     temp_files = [f.name for f in temp_contents]
     if tfile.name.replace('.fits', '.solved') not in temp_files:
+        log.warning('No solution from astrometry.net')
         center_coord = None
         radius = None
     else:
+        log.debug('Found solved file from astrometry.net')
         wcs_file = tfolder / tfile.name.replace('.fits', '.wcs')
         new_wcs = wcs.WCS(str(wcs_file))
         new_header = new_wcs.to_header(relax=True)
         # Update data model
-        DM.update_data(None,
-                              header=new_header.cards,
-                              history=['WCS solved by astrometry.net'])
+        DM.update_data(None, header=new_header.cards,
+                       history=['WCS solved by astrometry.net'])
         # Calculate and return center coordinate and field radius
         center_coord = new_wcs.pixel_to_world(DM.data.shape[0]/2, DM.data.shape[1]/2)
         center_coord_str = center_coord.to_string("hmsdms", sep=":", precision=1)
@@ -79,8 +80,10 @@ def solve_field(DM, cfg={}, center_coord=None):
     for f in temp_contents:
         log.debug(f"Deleted temp file: {str(f)}")
         f.unlink()
-    log.info(f'  Central Coordinate: {center_coord_str}')
-    log.info(f'  FoV radius: {radius:.1f} deg')
-    DM.center_coord = center_coord
-    DM.radius = radius
+    if center_coord is not None:
+        log.info(f'  Central Coordinate: {center_coord_str}')
+        log.info(f'  FoV radius: {radius:.1f} deg')
+        DM.center_coord = center_coord
+        DM.radius = radius
+    return center_coord
 

@@ -1,5 +1,5 @@
 #!python3
-
+import copy
 from astropy import units as u
 from astropy.time import Time
 from astropy.table import Table, Column
@@ -24,8 +24,13 @@ def query_vizier(DM, cfg=None):
                             radius=DM.radius*u.deg,
                             catalog=Vizier_name[catalog])
     assert len(r) > 0
-    stars = r[0]
-    if len(stars) > 0:
+    if len(r[0]) > 0:
+        stars = copy.deepcopy(r[0])
+        # Drop unused columns
+        drop_columns = ['logg', 'RUWE', 'QSO', 'Gal', 'NSS', 'XPcont', 'XPsamp',
+                        'MCMCGSP', 'MCMCMSC', 'And', '__Fe_H_']
+        stars.remove_columns(drop_columns)
+        r[0].remove_columns(drop_columns)
         wcs = DM.get_wcs()
         coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                           unit=(u.deg, u.deg),
@@ -39,9 +44,26 @@ def query_vizier(DM, cfg=None):
         log.info(f'  Image contains {len(stars[contains])} stars')
 
         DM.stars[catalog] = stars[contains]
-        return stars
+        return r[0]
     else:
         return None
+
+
+def apply_catalog(DM, reference_catalog, cfg=None):
+    catalog = cfg['Catalog'].get('catalog')
+    stars = copy.deepcopy(reference_catalog)
+    coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
+                      unit=(u.deg, u.deg),
+                      obstime=Time(2000, format='decimalyear'))
+    wcs = DM.get_wcs()
+    contains = wcs.footprint_contains(coords)
+    x, y = wcs.world_to_pixel(coords)
+    stars.add_column(Column(name='Catalog_X', data=x))
+    stars.add_column(Column(name='Catalog_Y', data=y))
+    log.info(f'  Image contains {len(stars[contains])} stars')
+    DM.stars[catalog] = stars[contains]
+
+
 
 
 # def get_Gaia(center_coord, radius):
