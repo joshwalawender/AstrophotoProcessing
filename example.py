@@ -9,6 +9,7 @@ from astropy.table import Table, Column
 from app import log
 from app.SmartEyeTools.find_stack import find_stack
 from app.data_models.OSCImage import OSCImage
+from app.data_models.ImageList import ImageList
 from app.reduce.bias_subtract import bias_subtract
 from app.analyze.run_astrometrydotnet import solve_field
 from app.analyze.get_catalog import query_vizier, apply_catalog
@@ -61,6 +62,22 @@ objectname = 'M78'
 data_dir = Path('~/Desktop/SmartEye_2026-02-05/').expanduser()
 stack = find_stack(data_dir, objectname)
 
+# Image List
+log.info('Loading input images to ImageList')
+raw_image_dir = data_dir/'Raw'
+images = ImageList([rf for rf in stack['RawFiles'][:3]],
+                   working_dir=data_dir / objectname,
+                   masters={'bias': OSCImage(stack['DarkFile'])},
+                   cfg=cfg,
+                   )
+images.results.pprint()
+images.process()
+images.results.pprint()
+
+sys.exit(0)
+
+
+
 # Populate inputs
 raw_files_dir = data_dir / 'Raw'
 raw_files = sorted(stack['RawFiles'])
@@ -69,8 +86,11 @@ master_bias_file = stack['DarkFile']
 master_bias = OSCImage(master_bias_file)
 catalog = cfg['Catalog'].get('catalog')
 
-# Create Summary Table of Images
 
+
+sys.exit(0)
+
+# Create Summary Table of Images
 images = Table([Column([], 'RawFile', str),
                 Column([], 'RA', str),
                 Column([], 'Dec', str),
