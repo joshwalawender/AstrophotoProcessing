@@ -16,6 +16,7 @@ def solve_field(DM, cfg={}, center_coord=None):
 
     cmd = [cfg['Astrometry.net'].get('solve-field','solve-field')]
     cmd.extend(['-p', '-O'])
+    cmd.extend(['--cpulimit', '100'])
     # index-dir
     index_dir = cfg['Astrometry.net'].get('index-dir', None)
     if index_dir: cmd.extend(['--index-dir', index_dir])
@@ -45,15 +46,18 @@ def solve_field(DM, cfg={}, center_coord=None):
     tfolder = tfile.parent
     cmd.append(str(tfile))
     log.info('Running Astrometry.net')
+    log.debug(' '.join(cmd))
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     log.debug('Astrometry.net STDOUT')
-    stdout_lines = proc.stdout.decode().strip().split('\n')
+    stdout_lines = proc.stdout.decode().strip('\n').strip().split('\n')
     for line in stdout_lines:
         log.debug(f"  {line}")
-    stderr_lines = proc.stderr.decode().strip().split('\n')
-    if len(stderr_lines) > 0: log.debug('Astrometry.net STDERR')
-    for line in stderr_lines:
-        log.debug(f"  {line}")
+    log.info(f"Astrometry.net STDOUT: {stdout_lines[-1]}")
+    stderr_lines = proc.stderr.decode().strip('\n').strip().split('\n')
+    if len(''.join(stderr_lines)) > 0:
+        log.error('Astrometry.net STDERR')
+        for line in stderr_lines:
+            log.error(f"  {line}")
     temp_contents = [f for f in tfolder.glob('*')]
     temp_files = [f.name for f in temp_contents]
     if tfile.name.replace('.fits', '.solved') not in temp_files:
