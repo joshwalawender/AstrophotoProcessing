@@ -336,7 +336,8 @@ class OSCImage(object):
     ## write_jpg
     ##-------------------------------------------------------------------------
     def write_jpg(self, output=None, radius=8):
-        '''Take the catalog stars and WCS and generate a PNG file 
+        '''Overlay the catalog stars using the WCS on the grayscale image and
+        generate a JPG file.
         '''
         log.info('Generating JPG image')
         catalog = list(self.stars.keys())[0]
@@ -403,6 +404,40 @@ class OSCImage(object):
         if jpeg_file.exists(): jpeg_file.unlink()
         log.info(f"Saving {str(jpeg_file)}")
         plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
+
+
+    ##-------------------------------------------------------------------------
+    ## write_jpg
+    ##-------------------------------------------------------------------------
+    def write_color_jpg(self, output=None):
+        '''Generate a color JPG file.
+        '''
+        log.info('Generating Color JPG image')
+#         plt.figure(figsize=(12,12), dpi=300)
+#         plt.imshow(image, origin='upper')
+#         plt.xlim(0,image.shape[1])
+#         plt.ylim(0,image.shape[0])
+#         plt.xticks([])
+#         plt.yticks([])
+        # Save JPEG
+        rawext = Path(self.raw_file_name).suffix
+        if output is None:
+            jpeg_file = Path(self.raw_file_name.replace(rawext, '_rgb.jpg'))
+        elif Path(output).is_dir():
+            jpeg_file = Path(output).expanduser() / self.raw_file_name.replace(rawext, '_rgb.jpg')
+        else:
+            jpeg_file = Path(output).expanduser()
+        if jpeg_file.exists(): jpeg_file.unlink()
+        log.info(f"Saving {str(jpeg_file)}")
+
+        vis.make_rgb(self.red, self.green, self.blue,
+                     interval=vis.AsymmetricPercentileInterval(1, 99.99),
+                     stretch=vis.LogStretch(),
+                     filename=jpeg_file)
+
+#         plt.savefig(jpeg_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
+
+
 
 
     ##-------------------------------------------------------------------------
