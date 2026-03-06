@@ -59,24 +59,9 @@ SaturationThreshold = 60000
 ##-------------------------------------------------------------------------
 
 # Derive file info from SmartEye file structure and metadata
-objectname = 'M78'
+objectname = 'NGC891'
 data_dir = Path('~/Desktop/SmartEye_2026-02-05/').expanduser()
 stack = find_stack(data_dir, objectname)
-
-# Image List
-# log.info('Loading input images to ImageList')
-# raw_image_dir = data_dir/'Raw'
-# images = ImageList([rf for rf in stack['RawFiles'][:2]],
-#                    working_dir=data_dir / objectname,
-#                    masters={'bias': OSCImage(stack['DarkFile'])},
-#                    cfg=cfg,
-#                    )
-# images.process()
-# images.results.pprint()
-#
-# sys.exit(0)
-
-
 
 raw_files_dir = data_dir / 'Raw'
 raw_files = sorted(stack['RawFiles'])
@@ -101,6 +86,25 @@ plot_WCSoffsets(image, cfg=cfg)
 # plot_skybrightness(image, cfg=cfg)
 
 sys.exit(0)
+
+
+#####
+
+# Image List
+# log.info('Loading input images to ImageList')
+# raw_image_dir = data_dir/'Raw'
+# images = ImageList([rf for rf in stack['RawFiles'][:2]],
+#                    working_dir=data_dir / objectname,
+#                    masters={'bias': OSCImage(stack['DarkFile'])},
+#                    cfg=cfg,
+#                    )
+# images.process()
+# images.results.pprint()
+#
+# sys.exit(0)
+
+
+
 
 #####
 
