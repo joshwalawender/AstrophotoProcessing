@@ -17,6 +17,7 @@ from app.analyze.photometry import photometry
 from app.analyze.derive_scaling import derive_scaling
 from app.plots.plot_zeropoints import plot_zeropoints
 from app.plots.plot_skybrightness import plot_skybrightness
+from app.plots.plot_WCSoffsets import plot_WCSoffsets
 
 
 ##-------------------------------------------------------------------------
@@ -37,7 +38,7 @@ PixelSize = 3.76
 [Astrometry.net]
 solve-field = /opt/homebrew/bin/solve-field
 downsample = 2
-SIPorder = 4
+SIPorder = 2
 
 [Catalog]
 catalog = Gaia DR3
@@ -63,22 +64,20 @@ data_dir = Path('~/Desktop/SmartEye_2026-02-05/').expanduser()
 stack = find_stack(data_dir, objectname)
 
 # Image List
-log.info('Loading input images to ImageList')
-raw_image_dir = data_dir/'Raw'
-images = ImageList([rf for rf in stack['RawFiles'][:3]],
-                   working_dir=data_dir / objectname,
-                   masters={'bias': OSCImage(stack['DarkFile'])},
-                   cfg=cfg,
-                   )
-images.results.pprint()
-images.process()
-images.results.pprint()
-
-sys.exit(0)
-
+# log.info('Loading input images to ImageList')
+# raw_image_dir = data_dir/'Raw'
+# images = ImageList([rf for rf in stack['RawFiles'][:2]],
+#                    working_dir=data_dir / objectname,
+#                    masters={'bias': OSCImage(stack['DarkFile'])},
+#                    cfg=cfg,
+#                    )
+# images.process()
+# images.results.pprint()
+#
+# sys.exit(0)
 
 
-# Populate inputs
+
 raw_files_dir = data_dir / 'Raw'
 raw_files = sorted(stack['RawFiles'])
 working_dir = data_dir / objectname
@@ -86,6 +85,24 @@ master_bias_file = stack['DarkFile']
 master_bias = OSCImage(master_bias_file)
 catalog = cfg['Catalog'].get('catalog')
 
+raw_file = raw_files[0]
+working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
+if working_file.exists():
+    image = OSCImage(working_file)
+else:
+    image = OSCImage(raw_file)
+    bias_subtract(image, master_bias=master_bias)
+    center_coord = solve_field(image, cfg=cfg)
+    reference_catalog = query_vizier(image, cfg=cfg)
+    photometry(image, cfg=cfg)
+
+plot_WCSoffsets(image, cfg=cfg)
+# plot_zeropoints(image, cfg=cfg)
+# plot_skybrightness(image, cfg=cfg)
+
+sys.exit(0)
+
+#####
 
 
 sys.exit(0)
