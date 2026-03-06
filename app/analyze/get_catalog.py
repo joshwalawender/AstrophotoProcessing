@@ -1,4 +1,3 @@
-#!python3
 import copy
 from astropy import units as u
 from astropy.time import Time

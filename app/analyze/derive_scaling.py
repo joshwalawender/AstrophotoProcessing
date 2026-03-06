@@ -1,5 +1,3 @@
-#!python3
-
 import numpy as np
 from astropy import stats
 from astropy.table import MaskedColumn
