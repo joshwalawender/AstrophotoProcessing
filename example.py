@@ -5,6 +5,8 @@ import configparser
 import numpy as np
 from astropy import units as u
 from astropy.table import Table, Column
+from astroquery.simbad import Simbad
+from astropy.coordinates import SkyCoord
 
 from app import log
 from app.SmartEyeTools.find_stack import find_stack
@@ -59,7 +61,7 @@ SaturationThreshold = 60000
 ##-------------------------------------------------------------------------
 
 # Derive file info from SmartEye file structure and metadata
-objectname = 'NGC891'
+objectname = 'M78'
 data_dir = Path('~/Desktop/SmartEye_2026-02-05/').expanduser()
 stack = find_stack(data_dir, objectname)
 
@@ -77,7 +79,15 @@ if working_file.exists():
 else:
     image = OSCImage(raw_file)
     bias_subtract(image, master_bias=master_bias)
-    center_coord = solve_field(image, cfg=cfg)
+    # Get estimated center from target name
+    try:
+        result = Simbad.query_object(objectname)
+        result.pprint()
+        estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                    unit=(u.deg, u.deg), frame='icrs')
+    except:
+        estimated_center = None
+    center_coord = solve_field(image, cfg=cfg, center_coord=estimated_center, search_radius=1)
     reference_catalog = query_vizier(image, cfg=cfg)
     photometry(image, cfg=cfg)
 
