@@ -11,7 +11,7 @@ from app.data_models.OSCImage import OSCImage
 ##-------------------------------------------------------------------------
 ## 
 ##-------------------------------------------------------------------------
-def solve_field(DM, cfg={}, center_coord=None):
+def solve_field(DM, cfg={}, center_coord=None, search_radius=0.25):
     assert isinstance(DM, OSCImage)
 
     cmd = [cfg['Astrometry.net'].get('solve-field','solve-field')]
@@ -39,7 +39,7 @@ def solve_field(DM, cfg={}, center_coord=None):
     if center_coord is not None:
         cmd.extend(['-3', f'{center_coord.ra.deg:.3f}'])
         cmd.extend(['-4', f'{center_coord.dec.deg:.3f}'])
-        cmd.extend(['-5', f'0.25'])
+        cmd.extend(['-5', f'{search_radius:.2f}'])
 
     # run astrometry.net on the temporary fits file
     tfile = DM.write_tmp()
