@@ -41,6 +41,7 @@ PixelSize = 3.76
 solve-field = /opt/homebrew/bin/solve-field
 downsample = 2
 SIPorder = 2
+index-dir = ~/astrometry_data
 
 [Catalog]
 catalog = Gaia DR3
@@ -53,7 +54,6 @@ Bmag = BPmag
 StarApertureRadius = 9
 SaturationThreshold = 60000
 ''')
-#index-dir = /Volumes/Ohina2External/astrometry_data
 
 
 ##-------------------------------------------------------------------------
