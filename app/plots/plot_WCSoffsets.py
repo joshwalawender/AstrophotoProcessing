@@ -33,11 +33,12 @@ def plot_WCSoffsets(DM, cfg=None):
     plt.figure(figsize=(5,8), dpi=100)
 
     plt.subplot(3,2,(1,4))
+    plt.title(f"Median Offset = {DM.WCS_median_offset:.2f} pix")
     plt.plot(stars['Catalog_X'][~out], stars['Catalog_Y'][~out], 'bo',
              ms=1, alpha=0.5)
     plt.quiver(stars['Catalog_X'][~out], stars['Catalog_Y'][~out],
                stars['WCSOffsetX'][~out], stars['WCSOffsetY'][~out],
-               angles='xy', scale_units='xy', scale=0.004,
+               angles='xy', scale_units='xy', scale=0.012,
                alpha=0.75)
     plt.gca().set_aspect('equal')
     plt.xlabel('X Pixel')
@@ -45,13 +46,16 @@ def plot_WCSoffsets(DM, cfg=None):
 
     plt.subplot(3,2,5)
     plt.hist(angles[~out].to(u.deg), bins=36)
+    plt.xlim(0,360)
     plt.xlabel('PA of WCS Offset (deg)')
     plt.ylabel('N stars')
 
     plt.subplot(3,2,6)
-    plt.plot(PA[~out].to(u.deg), angles[~out].to(u.deg), 'bo', ms=1, alpha=0.5)
+    plt.plot(angles[~out].to(u.deg), PA[~out].to(u.deg), 'bo', ms=1, alpha=0.5)
+    plt.xlim(0,360)
     plt.xlabel('PA of WCS Offset (deg)')
-    plt.xlabel('PA of Star in FoV (deg)')
+    plt.ylim(0,360)
+    plt.ylabel('PA of Star in FoV (deg)')
 
 
     # Save PNG
