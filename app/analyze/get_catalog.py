@@ -28,8 +28,10 @@ def query_vizier(DM, cfg=None):
         # Drop unused columns
         drop_columns = ['logg', 'RUWE', 'QSO', 'Gal', 'NSS', 'XPcont', 'XPsamp',
                         'MCMCGSP', 'MCMCMSC', 'And', '__Fe_H_']
-        stars.remove_columns(drop_columns)
-        r[0].remove_columns(drop_columns)
+        for column in drop_columns:
+            if column in stars.keys():
+                stars.remove_column(column)
+                r[0].remove_column(column)
         wcs = DM.get_wcs()
         coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                           unit=(u.deg, u.deg),
