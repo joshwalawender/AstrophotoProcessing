@@ -23,8 +23,8 @@ def photometry(DM, cfg=None):
 
     # Generate Background Subtracted Image for ApertureStats
     image = u.Quantity(np.array(DM.data))
-    scaled_image = u.Quantity(np.array(DM.data))/DM.exptime
-    backsub_image = u.Quantity(np.array(DM.data) - np.median(DM.data))
+#     scaled_image = u.Quantity(np.array(DM.data))/DM.exptime
+    backsub = u.Quantity(np.array(DM.data) - np.median(DM.data))
 
     ## Centroid stars and determine FWHM
     log.info(f'Centroiding catalog stars')
@@ -37,6 +37,8 @@ def photometry(DM, cfg=None):
                            ('orientation', 'orientation')]
     for p in aperture_properties:
         stars.add_column(Column(name=p[0], data=getattr(apstats, p[1])))
+    ncent = np.sum(~np.isnan(stars['Centroid_X']))
+    log.info(f'  Centroided {ncent} stars')
 
     # Evaluate WCS from Centroid Offsets
     deltaX = stars['Catalog_X'] - stars['Centroid_X']
@@ -48,7 +50,7 @@ def photometry(DM, cfg=None):
 #     DM.WCS_offset_RMS_X = np.mean(stars['WCSOffsetX']**2)**0.5
 #     DM.WCS_offset_RMS_Y = np.mean(stars['WCSOffsetY']**2)**0.5
     DM.WCS_median_offset = np.median(stars['WCSOffsetR'])
-    log.info(f'WCS Median Offset = {DM.WCS_median_offset:.2f} pix')
+    log.info(f'  WCS Median Offset = {DM.WCS_median_offset:.2f} pix')
 
     # Record Typical FWHM
     fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
@@ -64,30 +66,40 @@ def photometry(DM, cfg=None):
 
     ## Perform aperture photometry on stars
     for color in ['R', 'G', 'B']:
+        cmask = DM.mask[color]
         log.info(f'Performing {color} aperture photometry on catalog stars')
-        star_area = apertures.area_overlap(scaled_image,
-                                           mask=DM.mask[color])
-        star, errs = apertures.do_photometry(scaled_image,
-                                             mask=DM.mask[color])
-        sky_area = sky_apertures.area_overlap(scaled_image,
-                                              mask=DM.mask[color])
-        sky, sky_errs = sky_apertures.do_photometry(scaled_image,
-                                                    mask=DM.mask[color])
-        stars.add_column(Column(name=f'{color}StarArea', data=star_area))
+        star, errs = apertures.do_photometry(image, mask=cmask)
+        star = star/DM.exptime
         stars.add_column(Column(name=f'{color}StarSum', data=star))
-        stars.add_column(Column(name=f'{color}SkyArea', data=sky_area))
+        star_area = apertures.area_overlap(image, mask=cmask)
+        stars.add_column(Column(name=f'{color}StarArea', data=star_area))
+        sky, sky_errs = sky_apertures.do_photometry(image, mask=cmask)
+        sky = sky/DM.exptime
         stars.add_column(Column(name=f'{color}SkySum', data=sky))
+        sky_area = sky_apertures.area_overlap(image, mask=cmask)
+        stars.add_column(Column(name=f'{color}SkyArea', data=sky_area))
         stars.add_column(Column(name=f'{color}SkyMean', data=sky/sky_area))
+
 
         # Calculate Zero Point Values
         flux = stars[f'{color}StarSum'] - stars[f'{color}StarArea']*stars[f'{color}SkyMean']
         stars.add_column(Column(name=f'{color}StarFlux', data=flux))
         positive_sky = (stars[f'{color}SkyMean'] > 0)
+        Npositive_sky = np.sum(positive_sky)
+        log.debug(f'  {Npositive_sky} stars pass positive sky check')
         positive_flux = (stars[f'{color}StarFlux'] > 0)
+        Npositive_flux = np.sum(positive_flux)
+        log.debug(f'  {Npositive_flux} stars pass positive flux check')
         has_flux = ~np.isnan(stars[f'{color}StarFlux'])
+        Nhas_flux = np.sum(has_flux)
+        log.debug(f'  {Nhas_flux} stars pass flux existance check')
         not_saturated = stars['peak_value'] < float(cfg['Photometry'].get('SaturationThreshold', 60000))
+        Nnot_saturated = np.sum(not_saturated)
+        log.debug(f'  {Nnot_saturated} stars pass saturation check')
         good_photometry = positive_sky & positive_flux & has_flux & not_saturated
         stars.add_column(Column(name=f'{color}Photometry', data=good_photometry))
+        nphot = np.sum(stars[f'{color}Photometry'])
+        log.info(f'  Got photometry on {nphot} stars')
         instmag = [-2.5*np.log10(s[f'{color}StarFlux'])\
                    if s[f'{color}Photometry'] else np.nan for s in stars]
         stars.add_column(Column(name=f'{color}InstMag', data=instmag))
