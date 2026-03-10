@@ -19,8 +19,9 @@ def solve_field(DM, cfg={}, center_coord=None, search_radius=0.25):
     cmd.extend(['--cpulimit', '100'])
     # index-dir
     index_dir = cfg['Astrometry.net'].get('index-dir', None)
-    index_dir = Path(index_dir).expanduser().absolute()
-    if index_dir: cmd.extend(['--index-dir', str(index_dir)])
+    if index_dir:
+        index_dir = Path(index_dir).expanduser().absolute()
+        cmd.extend(['--index-dir', str(index_dir)])
     # downsample
     downsample = cfg['Astrometry.net'].getint('downsample', None)
     if downsample: cmd.extend(['-z', f'{downsample:d}'])
