@@ -7,6 +7,7 @@ from astropy import units as u
 from astropy.table import Table, Column
 from astroquery.simbad import Simbad
 from astropy.coordinates import SkyCoord
+from astropy import stats
 
 from app import log
 from app.SmartEyeTools.find_stack import find_stack
@@ -40,8 +41,7 @@ PixelSize = 3.76
 [Astrometry.net]
 solve-field = /opt/homebrew/bin/solve-field
 downsample = 2
-SIPorder = 2
-index-dir = ~/astrometry_data
+SIPorder = 1
 
 [Catalog]
 catalog = Gaia DR3
@@ -51,8 +51,8 @@ Rmag = RPmag
 Bmag = BPmag
 
 [Photometry]
-StarApertureRadius = 9
-SaturationThreshold = 60000
+StarApertureRadius = 10
+SaturationThreshold = 600000
 ''')
 
 
@@ -74,24 +74,22 @@ catalog = cfg['Catalog'].get('catalog')
 
 raw_file = raw_files[0]
 working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
-if working_file.exists():
-    image = OSCImage(working_file)
-else:
-    image = OSCImage(raw_file)
-    bias_subtract(image, master_bias=master_bias)
-    # Get estimated center from target name
-    try:
-        result = Simbad.query_object(objectname)
-        result.pprint()
-        estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
-                                    unit=(u.deg, u.deg), frame='icrs')
-    except:
-        estimated_center = None
-    center_coord = solve_field(image, cfg=cfg, center_coord=estimated_center, search_radius=1)
-    reference_catalog = query_vizier(image, cfg=cfg)
-    photometry(image, cfg=cfg)
-
-plot_WCSoffsets(image, cfg=cfg)
+image = OSCImage(raw_file)
+bias_subtract(image, master_bias=master_bias)
+# Get estimated center from target name
+try:
+    result = Simbad.query_object(objectname)
+    estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                unit=(u.deg, u.deg), frame='icrs')
+except:
+    estimated_center = None
+center_coord = solve_field(image, cfg=cfg,
+                           center_coord=estimated_center, search_radius=1)
+reference_catalog = query_vizier(image, cfg=cfg)
+photometry(image, cfg=cfg)
+image.write(working_file)
+image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
+# plot_WCSoffsets(image, cfg=cfg)
 # plot_zeropoints(image, cfg=cfg)
 # plot_skybrightness(image, cfg=cfg)
 
