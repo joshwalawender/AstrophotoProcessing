@@ -52,7 +52,7 @@ Bmag = BPmag
 
 [Photometry]
 StarApertureRadius = 10
-SaturationThreshold = 600000
+SaturationThreshold = 60000
 ''')
 
 
@@ -89,9 +89,9 @@ reference_catalog = query_vizier(image, cfg=cfg)
 photometry(image, cfg=cfg)
 image.write(working_file)
 image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
-# plot_WCSoffsets(image, cfg=cfg)
-# plot_zeropoints(image, cfg=cfg)
-# plot_skybrightness(image, cfg=cfg)
+plot_WCSoffsets(image, cfg=cfg)
+plot_zeropoints(image, cfg=cfg)
+plot_skybrightness(image, cfg=cfg)
 
 sys.exit(0)
 
