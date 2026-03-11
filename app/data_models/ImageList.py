@@ -2,6 +2,8 @@ from pathlib import Path
 
 import numpy as np
 from astropy.table import Table, Column, MaskedColumn
+from astroquery.simbad import Simbad
+from astropy.coordinates import SkyCoord
 
 from app import log
 from app.data_models.OSCImage import OSCImage
@@ -26,18 +28,14 @@ class ImageList(list):
     save out files?
     '''
     def __init__(self, iterable, working_dir=None, masters={},
-#                  processing_steps=[bias_subtract,
-#                                    solve_field,
-#                                    query_vizier,
-#                                    photometry,
-#                                   ],
+                 objectname=None,
                  imtype=OSCImage, cfg=None,
                  *args, **kwargs):
         super().__init__(iterable, *args, **kwargs)
         self.working_dir = working_dir
         self.imtype = imtype
         self.masters = masters
-#         self.processing_steps = processing_steps
+        self.objectname = objectname
         self.cfg = cfg
         self.sort()
         self.initialize_image_metadata_table()
@@ -88,7 +86,19 @@ class ImageList(list):
             if i==0:
                 image = self.imtype(self[i])
                 bias_subtract(image, master_bias=self.masters['bias'])
-                center_coord = solve_field(image, cfg=self.cfg)
+
+                if self.objectname is not None:
+                    try:
+                        result = Simbad.query_object(self.objectname)
+                        estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                                    unit=(u.deg, u.deg), frame='icrs')
+                    except:
+                        estimated_center = None
+                else:
+                    estimated_center = None
+                center_coord = solve_field(image, cfg=self.cfg,
+                                           center_coord=estimated_center,
+                                           search_radius=1)
                 reference_catalog = query_vizier(image, cfg=self.cfg)
                 photometry(image, cfg=self.cfg)
                 log.info(f'Writing processed file: {working_file.name}')
