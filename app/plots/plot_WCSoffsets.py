@@ -38,7 +38,7 @@ def plot_WCSoffsets(DM, cfg=None):
              ms=1, alpha=0.5)
     plt.quiver(stars['Catalog_X'][~out], stars['Catalog_Y'][~out],
                stars['WCSOffsetX'][~out], stars['WCSOffsetY'][~out],
-               angles='xy', scale_units='xy', scale=0.012,
+               angles='xy', scale_units='xy', scale=0.005,
                alpha=0.75)
     plt.gca().set_aspect('equal')
     plt.xlabel('X Pixel')
