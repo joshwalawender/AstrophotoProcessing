@@ -92,19 +92,25 @@ stack = find_stack(data_dir, objectname)
 # plot_WCSoffsets(image, cfg=cfg)
 # plot_zeropoints(image, cfg=cfg)
 # plot_skybrightness(image, cfg=cfg)
-# 
-# sys.exit(0)
 
 
 
 # Image List
 log.info('Loading input images to ImageList')
 raw_image_dir = data_dir/'Raw'
-images = ImageList([rf for rf in stack['RawFiles'][:2]],
+images = ImageList([rf for rf in stack['RawFiles']],
                    working_dir=data_dir / objectname,
                    objectname=objectname,
                    masters={'bias': OSCImage(stack['DarkFile'])},
-                   cfg=cfg,
-                   )
-images.process()
-images.results.pprint()
+                   cfg=cfg)
+if images.summary_file.exists():
+    print('Reading results file on disk')
+    images.results = Table.read(images.summary_file, format='ascii.csv')
+else:
+    images.process()
+    images.results.write(images.summary_file, format='ascii.csv')
+
+images.add_filter('FWHM < 90%')
+images.plot_image_quality()
+images.plot_photometry()
+
