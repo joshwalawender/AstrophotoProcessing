@@ -52,30 +52,30 @@ class ImageList(list):
         parsed = re.match('(\w+)\s([<>=]+)\s([\d\.]+)(\%?)', filter_string)
         if parsed is None:
             print(f"Failed to parse: {filter_string}")
-        else:
-            name = parsed.group(1)
-            op = parsed.group(2)
-            value = float(parsed.group(3))
-            pct = parsed.group(4)
-            self.filters.append((name, op, value, pct))
-
-        self.results['Use?'] = [True]*len(self)
-        for name, op, value, pct in self.filters:
-            if op == '<' and pct == '':
-#                 print(name, op, value, pct)
-                use = self.results[name] < value
-            elif op == '<' and pct == '%':
-                thresh = np.percentile(self.results[name], value)
-#                 print(name, op, value, pct, thresh)
-                new = self.results[name] < thresh
-            self.results['Use?'] = self.results['Use?'].data & new
-
+            return
+        name = parsed.group(1)
+        op = parsed.group(2)
+        value = float(parsed.group(3))
+        pct = parsed.group(4)
+        self.filters.append((name, op, value, pct))
+        if op == '<' and pct == '':
+            log.info(f"Applying filter: {name} {op} {value}")
+            new = self.results[name] < value
+        elif op == '<' and pct == '%':
+            thresh = np.percentile(self.results[name], value)
+            log.info(f"Applying filter: {name} {op} {value}{pct} ({thresh})")
+            new = self.results[name] < thresh
+        n_before = np.sum(self.results['Use?'])
+        self.results['Use?'] = self.results['Use?'].data & new
+        n_after = np.sum(self.results['Use?'])
+        deltaN = n_before-n_after
+        log.info(f'  Filter removed {deltaN} data points {n_after} now in use')
 
     def initialize_image_metadata_table(self):
         self.results = Table([Column([rf for rf in self], 'RawFile', str),
                               Column(['']*len(self), 'RA', 'S11'),
                               Column(['']*len(self), 'Dec', 'S12'),
-                              Column([np.nan]*len(self), 'WCS Offset', float),
+                              Column([np.nan]*len(self), 'WCSOffset', float),
                               Column([np.nan]*len(self), 'FWHM', float),
                               Column([np.nan]*len(self), 'Elongation', float),
                               Column([np.nan]*len(self), 'RZeroPoint', float),
@@ -96,7 +96,7 @@ class ImageList(list):
                               Column([np.nan]*len(self), 'BSkyBrightnessStdDev', float),
                               Column([np.nan]*len(self), 'BSkyOffset', float),
                               Column([np.nan]*len(self), 'BFluxScaling', float),
-                              Column([True]*len(self), 'Use?', bool),
+                              Column([1]*len(self), 'Use?', int),
                               ])
 
 
@@ -166,20 +166,20 @@ class ImageList(list):
 
 
     def plot_image_quality(self):
-        use = self.results['Use?'].data
+        use = np.array(self.results['Use?'].data, dtype=bool)
         imcount = np.arange(0,len(self),1,dtype=int)
 
-        plt.figure(figsize=(6,4))
+        plt.figure(figsize=(6,6))
         plt.rcParams.update({'font.size': 4})
 
-        plt.subplot(2,1,1)
+        plt.subplot(3,1,1)
         plt.title(f'FWHM Over Time')
         plt.plot(imcount, self.results['FWHM'], 'ko-')
         plt.plot(imcount[~use], self.results['FWHM'][~use], 'rx')
         plt.ylabel('FWHM (pix)')
         plt.grid()
 
-        plt.subplot(2,1,2)
+        plt.subplot(3,1,2)
         plt.title(f'Elongation Over Time')
         plt.plot(imcount, self.results['Elongation'], 'ko-')
         plt.plot(imcount[~use], self.results['Elongation'][~use], 'rx')
@@ -187,16 +187,24 @@ class ImageList(list):
         plt.ylabel('Elongation')
         plt.grid()
 
+        plt.subplot(3,1,3)
+        plt.title(f'WCSOffset Over Time')
+        plt.plot(imcount, self.results['WCSOffset'], 'ko-')
+        plt.plot(imcount[~use], self.results['WCSOffset'][~use], 'rx')
+        plt.xlabel('Sequence Number')
+        plt.ylabel('WCS Offset')
+        plt.grid()
+
         # Save PNG
         ext = Path(self.summary_file).suffix
         plot_file = Path(self.summary_file.name.replace(ext, '_IQ.png'))
         if plot_file.exists(): plot_file.unlink()
         log.info(f"Saving {str(plot_file)}")
-        plt.savefig(plot_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
+        plt.savefig(plot_file, bbox_inches='tight', pad_inches=0.1, dpi=200)
 
 
     def plot_photometry(self):
-        use = self.results['Use?'].data
+        use = np.array(self.results['Use?'].data, dtype=bool)
         imcount = np.arange(0,len(self),1,dtype=int)
 
         plt.figure(figsize=(6,4))
@@ -223,4 +231,4 @@ class ImageList(list):
         plot_file = Path(self.summary_file.name.replace(ext, '_Photometry.png'))
         if plot_file.exists(): plot_file.unlink()
         log.info(f"Saving {str(plot_file)}")
-        plt.savefig(plot_file, bbox_inches='tight', pad_inches=0.1, dpi=300)
+        plt.savefig(plot_file, bbox_inches='tight', pad_inches=0.1, dpi=200)
