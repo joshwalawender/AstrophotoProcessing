@@ -1,4 +1,3 @@
-# from astropy.nddata import CCDData
 import numpy as np
 from astropy.nddata import CCDData
 # import ccdproc
