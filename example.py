@@ -14,6 +14,7 @@ from app.SmartEyeTools.find_stack import find_stack
 from app.data_models.OSCImage import OSCImage
 from app.data_models.ImageList import ImageList
 from app.reduce.bias_subtract import bias_subtract
+from app.reduce.reproject import reproject
 from app.analyze.run_astrometrydotnet import solve_field
 from app.analyze.get_catalog import query_vizier, apply_catalog
 from app.analyze.photometry import photometry
@@ -65,29 +66,36 @@ objectname = 'M78'
 data_dir = Path('~/Desktop/SmartEye_2026-02-05/').expanduser()
 stack = find_stack(data_dir, objectname)
 
-# raw_files_dir = data_dir / 'Raw'
-# raw_files = sorted(stack['RawFiles'])
-# working_dir = data_dir / objectname
-# master_bias_file = stack['DarkFile']
-# master_bias = OSCImage(master_bias_file)
-# catalog = cfg['Catalog'].get('catalog')
-# 
-# raw_file = raw_files[0]
-# working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
-# image = OSCImage(raw_file)
-# bias_subtract(image, master_bias=master_bias)
-# # Get estimated center from target name
-# try:
-#     result = Simbad.query_object(objectname)
-#     estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
-#                                 unit=(u.deg, u.deg), frame='icrs')
-# except:
-#     estimated_center = None
-# center_coord = solve_field(image, cfg=cfg,
-#                            center_coord=estimated_center, search_radius=1)
-# reference_catalog = query_vizier(image, cfg=cfg)
-# photometry(image, cfg=cfg)
-# image.write(working_file)
+
+
+
+raw_files_dir = data_dir / 'Raw'
+raw_files = sorted(stack['RawFiles'])
+working_dir = data_dir / objectname
+master_bias_file = stack['DarkFile']
+master_bias = OSCImage(master_bias_file)
+catalog = cfg['Catalog'].get('catalog')
+
+reference_file = working_dir / raw_files[0].name.replace('.fit', '_processed.fits')
+reference_image = OSCImage(reference_file)
+
+raw_file = raw_files[1]
+working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
+image = OSCImage(raw_file)
+bias_subtract(image, master_bias=master_bias)
+# Get estimated center from target name
+try:
+    result = Simbad.query_object(objectname)
+    estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                unit=(u.deg, u.deg), frame='icrs')
+except:
+    estimated_center = None
+center_coord = solve_field(image, cfg=cfg,
+                           center_coord=estimated_center, search_radius=1)
+reference_catalog = query_vizier(image, cfg=cfg)
+photometry(image, cfg=cfg)
+reproject(image, reference_wcs=reference_image.get_wcs())
+image.write(working_file)
 # image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
 # plot_WCSoffsets(image, cfg=cfg)
 # plot_zeropoints(image, cfg=cfg)
@@ -96,21 +104,23 @@ stack = find_stack(data_dir, objectname)
 
 
 # Image List
-log.info('Loading input images to ImageList')
-raw_image_dir = data_dir/'Raw'
-images = ImageList([rf for rf in stack['RawFiles']],
-                   working_dir=data_dir / objectname,
-                   objectname=objectname,
-                   masters={'bias': OSCImage(stack['DarkFile'])},
-                   cfg=cfg)
-if images.summary_file.exists():
-    print('Reading results file on disk')
-    images.results = Table.read(images.summary_file, format='ascii.csv')
-else:
-    images.process()
-    images.results.write(images.summary_file, format='ascii.csv')
-
-images.add_filter('FWHM < 90%')
-images.plot_image_quality()
-images.plot_photometry()
+# log.info('Loading input images to ImageList')
+# raw_image_dir = data_dir/'Raw'
+# images = ImageList([rf for rf in stack['RawFiles']],
+#                    working_dir=data_dir / objectname,
+#                    objectname=objectname,
+#                    masters={'bias': OSCImage(stack['DarkFile'])},
+#                    cfg=cfg)
+# if images.summary_file.exists():
+#     print('Reading results file on disk')
+#     images.results = Table.read(images.summary_file, format='ascii.csv')
+# else:
+#     images.process()
+#     images.results.write(images.summary_file, format='ascii.csv')
+# 
+# images.add_filter('FWHM < 90%')
+# images.add_filter('WCSOffset < 0.20')
+# 
+# images.plot_image_quality()
+# images.plot_photometry()
 

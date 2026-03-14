@@ -12,7 +12,7 @@ from astropy.io.fits.verify import VerifyWarning
 import warnings
 warnings.simplefilter('ignore', category=VerifyWarning)
 
-from astropy.nddata import CCDData, block_reduce
+from astropy.nddata import CCDData, block_reduce, block_replicate
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, ICRS
 from astropy import wcs
@@ -198,15 +198,18 @@ class OSCImage(object):
     def split_colors(self):
         red = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['R']),
                            2, func=np.nanmean)
-        self.red = CCDData(data=red, unit='adu',
+        self.red = CCDData(data=block_replicate(red, 2), unit='adu',
+                           wcs=self.get_wcs(),
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Red'})
         green = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['G']),
                            2, func=np.nanmean)
-        self.green = CCDData(data=green, unit='adu',
+        self.green = CCDData(data=block_replicate(green, 2), unit='adu',
+                           wcs=self.get_wcs(),
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Green'})
         blue = block_reduce(np.ma.MaskedArray(data=self.data, mask=self.mask['B']),
                            2, func=np.nanmean)
-        self.blue = CCDData(data=blue, unit='adu',
+        self.blue = CCDData(data=block_replicate(blue, 2), unit='adu',
+                           wcs=self.get_wcs(),
                            meta={'APP_DM': 'OSCImage', 'COLOR': 'Blue'})
 
     ##-------------------------------------------------------------------------
@@ -310,14 +313,14 @@ class OSCImage(object):
                                           f'Flux Scaling Factor ({color})')
 
         # Three Colors
-#         for color in ['Red', 'Green', 'Blue']:
-#             cind = self.getHDU(color)
-#             chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
-#             chdu.header.set('EXTNAME', color)
-#             if cind == -1:
-#                 self.hdulist.append(chdu)
-#             else:
-#                 self.hdulist[cind] = chdu
+        for color in ['Red', 'Green', 'Blue']:
+            cind = self.getHDU(color)
+            chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
+            chdu.header.set('EXTNAME', color)
+            if cind == -1:
+                self.hdulist.append(chdu)
+            else:
+                self.hdulist[cind] = chdu
 
         # Write Catalog Stars to FITS Table
         for catalog in self.stars.keys():
