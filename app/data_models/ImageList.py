@@ -39,6 +39,7 @@ class ImageList(list):
         self.filters = []
         self.cfg = cfg
         self.sort()
+        self.reference = 0
         self.initialize_image_metadata_table()
 
 
@@ -165,6 +166,24 @@ class ImageList(list):
             self.results[i]['BSkyBrightnessStdDev'] = image.sky_brightness_stddev['B']
 
 
+    def set_reference_image(self, optimizer, op='min'):
+        assert optimizer in self.results.keys()
+        if op == 'min':
+            self.reference = np.argmin(self.results[optimizer])
+            value = self.results[optimizer][self.reference]
+            log.info(f"Minimum {optimizer} is {value} for frame {self.reference}")
+        if op == 'max':
+            self.reference = np.argmax(self.results[optimizer])
+            value = self.results[optimizer][self.reference]
+            log.info(f"Maximum {optimizer} is {value} for frame {self.reference}")
+
+
+    def reproject(self):
+        '''Re-project all images on to WCS of the reference image
+        '''
+        pass
+
+
     def plot_image_quality(self):
         use = np.array(self.results['Use?'].data, dtype=bool)
         imcount = np.arange(0,len(self),1,dtype=int)
@@ -176,6 +195,7 @@ class ImageList(list):
         plt.title(f'FWHM Over Time')
         plt.plot(imcount, self.results['FWHM'], 'ko-')
         plt.plot(imcount[~use], self.results['FWHM'][~use], 'rx')
+        plt.plot(imcount[self.reference], self.results['FWHM'][self.reference], 'g+')
         plt.ylabel('FWHM (pix)')
         plt.grid()
 
@@ -183,6 +203,7 @@ class ImageList(list):
         plt.title(f'Elongation Over Time')
         plt.plot(imcount, self.results['Elongation'], 'ko-')
         plt.plot(imcount[~use], self.results['Elongation'][~use], 'rx')
+        plt.plot(imcount[self.reference], self.results['Elongation'][self.reference], 'g+')
         plt.xlabel('Sequence Number')
         plt.ylabel('Elongation')
         plt.grid()
@@ -191,6 +212,7 @@ class ImageList(list):
         plt.title(f'WCSOffset Over Time')
         plt.plot(imcount, self.results['WCSOffset'], 'ko-')
         plt.plot(imcount[~use], self.results['WCSOffset'][~use], 'rx')
+        plt.plot(imcount[self.reference], self.results['WCSOffset'][self.reference], 'g+')
         plt.xlabel('Sequence Number')
         plt.ylabel('WCS Offset')
         plt.grid()
