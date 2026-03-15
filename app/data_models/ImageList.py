@@ -181,7 +181,17 @@ class ImageList(list):
     def reproject(self):
         '''Re-project all images on to WCS of the reference image
         '''
-        pass
+        reference_filename = self[self.reference].name.replace('.fit', '_processed.fits')
+        reference_file = self.working_dir / reference_filename
+        log.info(f'-----------------------------------------------------------')
+        log.info(f'Reprojecting Images: Reference is {reference_filename}')
+        reference_image = self.imtype(reference_file)
+        reference_wcs = reference_image.get_wcs()
+        for i in range(len(self)):
+            working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
+            log.info(f'Reprojecting file {i+1}/{len(self)}: {working_file.name}')
+            image = self.imtype(working_file)
+            reproject(image, reference_wcs=reference_wcs)
 
 
     def plot_image_quality(self):
