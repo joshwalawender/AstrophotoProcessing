@@ -209,3 +209,4 @@ __marimo__/
 *.jpg
 *.fit
 *.fits
+*_results.txt
