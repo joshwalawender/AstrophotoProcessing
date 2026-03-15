@@ -118,7 +118,8 @@ else:
     images.process()
     images.results.write(images.summary_file, format='ascii.csv')
 
-images.set_reference_image('Elongation', op='min')
+images.set_reference_image('FWHM', op='min')
+
 images.add_filter('FWHM < 90%')
 images.add_filter('WCSOffset < 0.20')
 images.plot_image_quality()

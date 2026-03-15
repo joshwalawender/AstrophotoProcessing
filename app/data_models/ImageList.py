@@ -50,7 +50,7 @@ class ImageList(list):
         FWHM < 8.2
         Elongation < 1.10
         '''
-        parsed = re.match('(\w+)\s([<>=]+)\s([\d\.]+)(\%?)', filter_string)
+        parsed = re.match('(\w+)\s([<>=]+)\s([\d\.]+)(%?)', filter_string)
         if parsed is None:
             print(f"Failed to parse: {filter_string}")
             return
@@ -149,7 +149,7 @@ class ImageList(list):
             radecstr = image.center_coord.to_string('hmsdms', sep=':', precision=2)
             self.results[i]['RA'] = radecstr.split()[0]
             self.results[i]['Dec'] = radecstr.split()[1]
-            self.results[i]['WCS Offset'] = image.WCS_median_offset
+            self.results[i]['WCSOffset'] = image.WCS_median_offset
             self.results[i]['FWHM'] = image.fwhm
             self.results[i]['Elongation'] = image.elongation
             self.results[i]['RZeroPoint'] = image.zero_point['R']
