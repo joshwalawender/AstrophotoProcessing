@@ -193,6 +193,7 @@ class ImageList(list):
             log.info(f'Reprojecting file {i+1}/{len(self)}: {working_file.name}')
             image = self.imtype(working_file)
             reproject(image, reference_wcs=reference_wcs)
+            image.write(working_file)
 
 
     def plot_image_quality(self):
