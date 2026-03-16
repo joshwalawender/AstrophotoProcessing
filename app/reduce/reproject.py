@@ -17,7 +17,10 @@ def reproject(DM, reference_wcs=None):
 
     log.info('Reprojecting red image')
     DM.red = wcs_project(DM.red, reference_wcs)
+    DM.red.meta['ALIGNED'] = 'True'
     log.info('Reprojecting green image')
     DM.green = wcs_project(DM.green, reference_wcs)
+    DM.green.meta['ALIGNED'] = 'True'
     log.info('Reprojecting blue image')
     DM.blue = wcs_project(DM.blue, reference_wcs)
+    DM.blue.meta['ALIGNED'] = 'True'
