@@ -114,13 +114,13 @@ class OSCImage(object):
 
             
             # Read in Individual Color Images
-#             for color in ['Red', 'Green', 'Blue']:
-#                 ind = self.getHDU(color)
-#                 data = CCDData(data=self.hdulist[ind].data,
-#                                meta={'APP_DM': 'OSCImage', 'COLOR': color},
-#                                unit='adu',
-#                                )
-#                 setattr(self, color.lower(), data)
+            for color in ['Red', 'Green', 'Blue']:
+                ind = self.getHDU(color)
+                data = CCDData(data=self.hdulist[ind].data,
+                               meta={'APP_DM': 'OSCImage', 'COLOR': color},
+                               unit='adu',
+                               )
+                setattr(self, color.lower(), data)
 
             # Read in FWHM Values
             hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
