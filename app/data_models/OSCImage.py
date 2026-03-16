@@ -89,6 +89,7 @@ class OSCImage(object):
             self.build_color_mask()
             self.center_coord = None
             self.radius = None
+            self.split_colors()
         else:
             processed = self.getHDU('PROCESSED')
             # Check this is our data model
@@ -111,7 +112,6 @@ class OSCImage(object):
             else:
                 self.radius = None
             self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
-
             
             # Read in Individual Color Images
             for color in ['Red', 'Green', 'Blue']:
@@ -156,8 +156,6 @@ class OSCImage(object):
                 hdr_fs = self.hdulist[processed].header.get(f'{color}FLUXSCL', None)
                 if hdr_fs: self.flux_scaling[color] = float(hdr_fs)
 
-
-        self.split_colors()
 
         # Build Catalogs
         if 'Gaia DR3' not in self.hdu_names:
