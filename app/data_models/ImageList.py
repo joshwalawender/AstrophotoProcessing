@@ -216,33 +216,36 @@ class ImageList(list):
         greens = []
         blues = []
         for i in range(len(self)):
-            if self.results[i]['Use?'] != True:
-                print(self.results[i]['USe?'])
-            else:
+            if self.results[i]['Use?'] == True:
                 working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
                 log.info(f'Opening file {i+1}/{len(self)} for stacking: {working_file.name}')
                 image = self.imtype(working_file)
-                aligned = image.red.meta.get('ALIGNED')
-                print(aligned)
                 reds.append(image.red)
                 greens.append(image.green)
                 blues.append(image.blue)
 
-        print(len(reds), len(greens), len(blues))
-
+        log.info(f'Combining {len(reds)} red images')
         red_combiner = ccdproc.Combiner(reds)
-        red_stacked = red_combiner.average_combine()
-        red_file = 'red.fits'
+        red_combiner.scaling=self.results['RFluxScaling']
+        red_stacked = red_combiner.sigma_clipping()
+        red_file = Path('red.fits')
+        if red_file.exists(): red_file.unlink()
         ccdproc.fits_ccddata_writer(red_stacked, red_file)
 
+        log.info(f'Combining {len(greens)} green images')
         green_combiner = ccdproc.Combiner(greens)
-        green_stacked = green_combiner.average_combine()
-        green_file = 'green.fits'
+        green_combiner.scaling=self.results['GFluxScaling']
+        green_stacked = green_combiner.sigma_clipping()
+        green_file = Path('green.fits')
+        if green_file.exists(): green_file.unlink()
         ccdproc.fits_ccddata_writer(green_stacked, green_file)
 
+        log.info(f'Combining {len(blues)} blue images')
         blue_combiner = ccdproc.Combiner(blues)
-        blue_stacked = blue_combiner.average_combine()
-        blue_file = 'blue.fits'
+        blue_combiner.scaling=self.results['BFluxScaling']
+        blue_stacked = blue_combiner.sigma_clipping()
+        blue_file = Path('blue.fits')
+        if blue_file.exists(): blue_file.unlink()
         ccdproc.fits_ccddata_writer(blue_stacked, blue_file)
         
 
