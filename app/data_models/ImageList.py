@@ -178,6 +178,18 @@ class ImageList(list):
             self.reference = np.argmax(self.results[optimizer])
             value = self.results[optimizer][self.reference]
             log.info(f"Maximum {optimizer} is {value} for frame {self.reference}")
+        reference_filename = self[self.reference].name.replace('.fit', '_processed.fits')
+        reference_file = self.working_dir / reference_filename
+        reference_image = self.imtype(reference_file)
+        log.info(f'-----------------------------------------------------------')
+        log.info(f'Determining Scaling: Reference is {reference_filename}')
+        for i in range(len(self)):
+            working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
+            image = self.imtype(working_file)
+            derive_scaling(image, reference=reference_image)
+            for c in ['R', 'G', 'B']:
+                self.results[f'{c}FluxScaling'] = image.flux_scaling[c]
+                self.results[f'{c}SkyOffset'] = image.background_offset[c]
 
 
     def reproject(self):
