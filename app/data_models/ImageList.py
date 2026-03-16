@@ -186,7 +186,7 @@ class ImageList(list):
         for i in range(len(self)):
             working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
             image = self.imtype(working_file)
-            derive_scaling(image, reference=reference_image)
+            derive_scaling(image, reference=reference_image, cfg=self.cfg)
             for c in ['R', 'G', 'B']:
                 self.results[f'{c}FluxScaling'] = image.flux_scaling[c]
                 self.results[f'{c}SkyOffset'] = image.background_offset[c]
