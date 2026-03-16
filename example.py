@@ -116,12 +116,16 @@ if images.summary_file.exists():
     images.results = Table.read(images.summary_file, format='ascii.csv')
 else:
     images.process()
-    images.results.write(images.summary_file, format='ascii.csv')
+    images.set_reference_image('FWHM', op='min')
+    images.reproject()
+    summary_file = data_dir / objectname / images.summary_file.name
+    images.results.write(summary_file, format='ascii.csv')
 
-images.set_reference_image('FWHM', op='min')
+use = images.results['Use?']
+print(images.results['GFluxScaling'].data)
 
 images.add_filter('FWHM < 90%')
 images.add_filter('WCSOffset < 0.20')
 images.plot_image_quality()
 images.plot_photometry()
-images.reproject()
+images.combine()
