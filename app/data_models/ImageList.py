@@ -5,6 +5,7 @@ from astropy.table import Table, Column, MaskedColumn
 from astroquery.simbad import Simbad
 from astropy.coordinates import SkyCoord
 from matplotlib import pyplot as plt
+import ccdproc
 
 from app import log
 from app.data_models.OSCImage import OSCImage
@@ -195,6 +196,43 @@ class ImageList(list):
             reproject(image, reference_wcs=reference_wcs)
             image.write(working_file)
 
+
+    def combine(self):
+        log.info(f'-----------------------------------------------------------')
+        log.info(f'Combining Images:')
+        reds = []
+        greens = []
+        blues = []
+        for i in range(len(self)):
+            if self.results[i]['Use?'] != True:
+                print(self.results[i]['USe?'])
+            else:
+                working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
+                log.info(f'Opening file {i+1}/{len(self)} for stacking: {working_file.name}')
+                image = self.imtype(working_file)
+                aligned = image.red.meta.get('ALIGNED')
+                print(aligned)
+                reds.append(image.red)
+                greens.append(image.green)
+                blues.append(image.blue)
+
+        print(len(reds), len(greens), len(blues))
+
+        red_combiner = ccdproc.Combiner(reds)
+        red_stacked = red_combiner.average_combine()
+        red_file = 'red.fits'
+        ccdproc.fits_ccddata_writer(red_stacked, red_file)
+
+        green_combiner = ccdproc.Combiner(greens)
+        green_stacked = green_combiner.average_combine()
+        green_file = 'green.fits'
+        ccdproc.fits_ccddata_writer(green_stacked, green_file)
+
+        blue_combiner = ccdproc.Combiner(blues)
+        blue_stacked = blue_combiner.average_combine()
+        blue_file = 'blue.fits'
+        ccdproc.fits_ccddata_writer(blue_stacked, blue_file)
+        
 
     def plot_image_quality(self):
         use = np.array(self.results['Use?'].data, dtype=bool)
