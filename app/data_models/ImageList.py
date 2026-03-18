@@ -82,7 +82,7 @@ class ImageList(list):
         log.info(f'  Filter removed {deltaN} data points {n_after} now in use')
 
     def initialize_image_metadata_table(self):
-        self.results = Table([Column([rf for rf in self], 'RawFile', str),
+        self.results = Table([Column([i.raw_file_name for i in self], 'RawFile', str),
                               Column(['']*len(self), 'RA', 'S11'),
                               Column(['']*len(self), 'Dec', 'S12'),
                               Column([np.nan]*len(self), 'WCSOffset', float),
@@ -210,7 +210,7 @@ class ImageList(list):
 
         log.info(f'Combining {len(reds)} red images')
         red_combiner = ccdproc.Combiner(reds)
-        red_combiner.scaling=self.results['RFluxScaling']
+        red_combiner.scaling=self.results['RFluxScaling'].data
         red_stacked = red_combiner.sigma_clipping()
         red_file = Path('red.fits')
         if red_file.exists(): red_file.unlink()
@@ -218,7 +218,7 @@ class ImageList(list):
 
         log.info(f'Combining {len(greens)} green images')
         green_combiner = ccdproc.Combiner(greens)
-        green_combiner.scaling=self.results['GFluxScaling']
+        green_combiner.scaling=self.results['GFluxScaling'].data
         green_stacked = green_combiner.sigma_clipping()
         green_file = Path('green.fits')
         if green_file.exists(): green_file.unlink()
@@ -226,7 +226,7 @@ class ImageList(list):
 
         log.info(f'Combining {len(blues)} blue images')
         blue_combiner = ccdproc.Combiner(blues)
-        blue_combiner.scaling=self.results['BFluxScaling']
+        blue_combiner.scaling=self.results['BFluxScaling'].data
         blue_stacked = blue_combiner.sigma_clipping()
         blue_file = Path('blue.fits')
         if blue_file.exists(): blue_file.unlink()
