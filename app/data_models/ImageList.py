@@ -32,15 +32,22 @@ class ImageList(list):
                  objectname=None,
                  imtype=OSCImage, cfg=None,
                  *args, **kwargs):
-        super().__init__(iterable, *args, **kwargs)
+        imagelist = []
+        iterable = sorted(iterable)
+        for i,item in enumerate(iterable):
+            if isinstance(item, imtype):
+                imagelist.append(item)
+            else:
+                imagelist.append(imtype(item))
+        super().__init__(imagelist, *args, **kwargs)
         self.working_dir = working_dir
         self.imtype = imtype
         self.masters = masters
         self.objectname = objectname
-        self.summary_file = Path(f'{objectname}_results.txt')
+        self.summary_file = working_dir / objectname / f'{objectname}.txt'
         self.filters = []
         self.cfg = cfg
-        self.sort()
+#         self.sort(key=lambda x: x.raw_file_name)
         self.reference = 0
         self.initialize_image_metadata_table()
 
@@ -107,46 +114,32 @@ class ImageList(list):
         '''Iterate over entries in list and run each through the specified
         process (e.g. bias_subtract). Hold resulting data models in ImageList.
         '''
-        for i in range(len(self)):
-            working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
+        # Get initial guess at center coordinate from object name
+        reference_catalog = None
+        if self.objectname is not None:
+            try:
+                result = Simbad.query_object(self.objectname)
+                center_coord = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                        unit=(u.deg, u.deg), frame='icrs')
+            except:
+                center_coord = None
+        else:
+            center_coord = None
+        
+        for i,image in enumerate(self):
             log.info(f'-----------------------------------------------------------')
-            log.info(f'Processing file {i+1}/{len(self)}: {working_file.name}')
-            if i==0:
-                image = self.imtype(self[i])
-                bias_subtract(image, master_bias=self.masters['bias'])
-
-                if self.objectname is not None:
-                    try:
-                        result = Simbad.query_object(self.objectname)
-                        estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
-                                                    unit=(u.deg, u.deg), frame='icrs')
-                    except:
-                        estimated_center = None
-                else:
-                    estimated_center = None
-                center_coord = solve_field(image, cfg=self.cfg,
-                                           center_coord=estimated_center,
-                                           search_radius=1)
-                reference_catalog = query_vizier(image, cfg=self.cfg)
-                photometry(image, cfg=self.cfg)
-                log.info(f'Writing processed file: {working_file.name}')
-                image.write(working_file)
+            log.info(f'Processing file {i+1}/{len(self)}: {image.raw_file_name}')
+            bias_subtract(image, master_bias=self.masters['bias'])
+            center_coord = solve_field(image, cfg=self.cfg,
+                                       center_coord=center_coord,
+                                       search_radius=0.5)
+            if center_coord is None:
+                log.warning(f'Plate solve for {image.raw_file_name} failed')
             else:
-                if working_file.exists():
-                    log.info(f'Found existing file: {working_file.name}')
-                    image = self.imtype(working_file)
-                else:
-                    image = self.imtype(self[i])
-                    bias_subtract(image, master_bias=self.masters['bias'])
-                    success = solve_field(image, cfg=self.cfg,
-                                          center_coord=center_coord)
-                    if success is None:
-                        log.warning(f'Image {working_file.name} failed')
-                    else:
-                        apply_catalog(image, reference_catalog, cfg=self.cfg)
-                        photometry(image, cfg=self.cfg)
-                        log.info(f'Writing processed file: {working_file.name}')
-                        image.write(working_file)
+                if reference_catalog is None:
+                    reference_catalog = query_vizier(image, cfg=self.cfg)
+                apply_catalog(image, reference_catalog, cfg=self.cfg)
+                photometry(image, cfg=self.cfg)
             # Record image results to table
             radecstr = image.center_coord.to_string('hmsdms', sep=':', precision=2)
             self.results[i]['RA'] = radecstr.split()[0]
@@ -178,14 +171,11 @@ class ImageList(list):
             self.reference = np.argmax(self.results[optimizer])
             value = self.results[optimizer][self.reference]
             log.info(f"Maximum {optimizer} is {value} for frame {self.reference}")
-        reference_filename = self[self.reference].name.replace('.fit', '_processed.fits')
-        reference_file = self.working_dir / reference_filename
-        reference_image = self.imtype(reference_file)
+        reference_image = self[self.reference]
+        reference_filename = reference_image.raw_file_name.replace('.fit', '_processed.fits')
         log.info(f'-----------------------------------------------------------')
         log.info(f'Determining Scaling: Reference is {reference_filename}')
-        for i in range(len(self)):
-            working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
-            image = self.imtype(working_file)
+        for i,image in enumerate(self):
             derive_scaling(image, reference=reference_image, cfg=self.cfg)
             for c in ['R', 'G', 'B']:
                 self.results[f'{c}FluxScaling'] = image.flux_scaling[c]
@@ -195,18 +185,14 @@ class ImageList(list):
     def reproject(self):
         '''Re-project all images on to WCS of the reference image
         '''
-        reference_filename = self[self.reference].name.replace('.fit', '_processed.fits')
-        reference_file = self.working_dir / reference_filename
+        reference_image = self[self.reference]
+        reference_filename = reference_image.raw_file_name.replace('.fit', '_processed.fits')
         log.info(f'-----------------------------------------------------------')
         log.info(f'Reprojecting Images: Reference is {reference_filename}')
-        reference_image = self.imtype(reference_file)
         reference_wcs = reference_image.get_wcs()
-        for i in range(len(self)):
-            working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
-            log.info(f'Reprojecting file {i+1}/{len(self)}: {working_file.name}')
-            image = self.imtype(working_file)
+        for i,image in enumerate(self):
+            log.info(f'Reprojecting file {i+1}/{len(self)}: {image.raw_file_name}')
             reproject(image, reference_wcs=reference_wcs)
-            image.write(working_file)
 
 
     def combine(self):
@@ -215,11 +201,9 @@ class ImageList(list):
         reds = []
         greens = []
         blues = []
-        for i in range(len(self)):
+        for i,image in enumerate(self):
             if self.results[i]['Use?'] == True:
-                working_file = self.working_dir / self[i].name.replace('.fit', '_processed.fits')
-                log.info(f'Opening file {i+1}/{len(self)} for stacking: {working_file.name}')
-                image = self.imtype(working_file)
+                log.info(f'Opening file {i+1}/{len(self)} for stacking: {image.raw_file_name}')
                 reds.append(image.red)
                 greens.append(image.green)
                 blues.append(image.blue)

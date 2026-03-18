@@ -9,7 +9,7 @@ from app import log
 ## 
 ##-------------------------------------------------------------------------
 def derive_scaling(DM, reference=None, cfg=None):
-    log.info('Deriving image scaling parameters')
+    log.info(f'Deriving image scaling parameters: {DM.raw_file_name}')
     catalog = cfg['Catalog'].get('catalog')
     stars = DM.stars.get(catalog, [])
     refstars = reference.stars.get(catalog, [])

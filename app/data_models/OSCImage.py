@@ -27,21 +27,18 @@ from app import log
 
 
 class OSCImage(object):
-    def __init__(self, hdulist, *args, **kwargs):
-        if isinstance(hdulist, str):
-            hdulist = Path(hdulist).expanduser().absolute()
-        if isinstance(hdulist, Path):
-            hdulist = hdulist.expanduser().absolute()
-            assert hdulist.exists()
-            self.raw_file_name = hdulist.name
-            log.debug(f'Instantiating data model from {self.raw_file_name}')
-            hdulist = fits.open(hdulist)
+    def __init__(self, inputval, *args, **kwargs):
+        if isinstance(inputval, str):
+            inputpath = Path(inputval).expanduser().absolute()
+        if isinstance(inputval, Path):
+            inputpath = inputval.expanduser().absolute()
         else:
             print(f"HDUList input {type(hdulist)} is unknown")
             sys.exit(1)
-        self.hdulist = hdulist
+        assert inputpath.exists()
+        log.debug(f'Instantiating data model from {inputval.name}')
+        self.hdulist = fits.open(inputval)
         self.hdulist.verify("fix")
-        self.hdu_names = [hdu.name for hdu in self.hdulist]
         self.WCS_median_offset = None
         self.fwhm = None
         self.fwhm_stddev = None
@@ -56,29 +53,34 @@ class OSCImage(object):
         self.flux_scaling = {}
         self.tempdir = Path(tempfile.mkdtemp())
 
-        # Connect to ds9 via SAMP
-        try:
-            self.ds9 = samp.SAMPIntegratedClient()
-            self.ds9.connect()
-        except samp.errors.SAMPHubError as e:
-            self.ds9 = None
-        except Exception as e:
-            print('Unable to connect to ds9')
-            print(type(e))
-            print(e)
-            self.ds9 = None
+#         # Connect to ds9 via SAMP
+#         try:
+#             self.ds9 = samp.SAMPIntegratedClient()
+#             self.ds9.connect()
+#         except samp.errors.SAMPHubError as e:
+#             self.ds9 = None
+#         except Exception as e:
+#             print('Unable to connect to ds9')
+#             print(type(e))
+#             print(e)
+#             self.ds9 = None
 
         # Assume first extension is primary (Raw data)
-        assert self.hdu_names[0] == 'PRIMARY'
+        assert self.hdulist[0].name == 'PRIMARY'
         self.exptime = float(self.hdulist[0].header.get('EXPTIME', 0))
 
+        # Is is a newly opened file (single extension) or is a a processed
+        # instance of an OSCImage which has been written to FITS file?
+        processed = 'PROCESSED' in [hdu.name for hdu in self.hdulist]
+
+
         # Create PROCESSED extension if needed
-        if 'PROCESSED' not in self.hdu_names:
+        if not processed:
             # This is a new data model
             # Build PROCESSED Extension
             header = fits.Header()
             header.set('APP_DM', 'OSCImage', 'Which type of APP data model is this?')
-            processed_hdu = fits.ImageHDU(data=hdulist[0].data,
+            processed_hdu = fits.ImageHDU(data=self.hdulist[0].data,
                                           header=header,
                                           name='PROCESSED')
             self.hdulist.append(processed_hdu)
@@ -90,29 +92,35 @@ class OSCImage(object):
             self.center_coord = None
             self.radius = None
             self.split_colors()
+            self.raw_file_name = inputpath.name
         else:
-            processed = self.getHDU('PROCESSED')
+            # This is a previously processed data model
+            # Read Extensions
+            pind = self.getHDU('PROCESSED')
             # Check this is our data model
-            assert self.hdulist[processed].header.get('APP_DM') == 'OSCImage'
-            self.data = CCDData(data=self.hdulist[processed].data,
+            assert self.hdulist[pind].header.get('APP_DM') == 'OSCImage'
+            # Read in data extension as CCDData object
+            self.data = CCDData(data=self.hdulist[pind].data,
                                 meta={'APP_DM': 'OSCImage'},
                                 unit='adu',
                                 )
             self.build_color_mask()
-            ra_str = self.hdulist[processed].header.get('CENT_RA', None)
-            dec_str = self.hdulist[processed].header.get('CENT_DEC', None)
+            # Read center coordinate
+            ra_str = self.hdulist[pind].header.get('CENT_RA', None)
+            dec_str = self.hdulist[pind].header.get('CENT_DEC', None)
             if ra_str and dec_str:
                 self.center_coord = SkyCoord(ra_str, dec_str, frame=ICRS,
                                              unit=(u.hourangle, u.deg))
             else:
                 self.center_coord = None
-            fovrad = self.hdulist[processed].header.get('FOVRAD', None)
+            # Read FOV Radius
+            fovrad = self.hdulist[pind].header.get('FOVRAD', None)
             if fovrad:
                 self.radius = float(fovrad)
             else:
                 self.radius = None
-            self.raw_file_name = self.hdulist[processed].header.get('RAWNAME', None)
-            
+            # Read raw file name
+            self.raw_file_name = self.hdulist[pind].header.get('RAWNAME', None)
             # Read in Individual Color Images
             for color in ['Red', 'Green', 'Blue']:
                 ind = self.getHDU(color)
@@ -123,42 +131,42 @@ class OSCImage(object):
                 setattr(self, color.lower(), data)
 
             # Read in FWHM Values
-            hdr_fwhm = self.hdulist[processed].header.get('FWHM', None)
+            hdr_fwhm = self.hdulist[pind].header.get('FWHM', None)
             self.fwhm = float(hdr_fwhm) if hdr_fwhm is not None else None
-            hdr_fwhm_std = self.hdulist[processed].header.get('FWHMSTD', None)
+            hdr_fwhm_std = self.hdulist[pind].header.get('FWHMSTD', None)
             self.fwhm_stddev = float(hdr_fwhm_std) if hdr_fwhm_std is not None else None
             # Read in elongation Values
-            hdr_elng = self.hdulist[processed].header.get('ELNG', None)
+            hdr_elng = self.hdulist[pind].header.get('ELNG', None)
             self.elongation = float(hdr_elng) if hdr_elng is not None else None
-            hdr_elng_std = self.hdulist[processed].header.get('ELNGSTD', None)
+            hdr_elng_std = self.hdulist[pind].header.get('ELNGSTD', None)
             self.elongation_stddev = float(hdr_elng_std) if hdr_elng_std is not None else None
 
             # Read in WCS Offset Value
-            hdr_WCS_median_offset = self.hdulist[processed].header.get('WCSOFFST', None)
+            hdr_WCS_median_offset = self.hdulist[pind].header.get('WCSOFFST', None)
             self.WCS_median_offset = float(hdr_WCS_median_offset) if hdr_WCS_median_offset is not None else None
 
             # Read in Photometry Reference Comparison Values
-            hdr_ref = self.hdulist[processed].header.get('PHOTREF', None)
+            hdr_ref = self.hdulist[pind].header.get('PHOTREF', None)
             self.reference = hdr_ref if hdr_ref is not None else None
 
             # Read in Zero Point Values
             for color in ['R', 'G', 'B']:
-                hdr_zp = self.hdulist[processed].header.get(f'{color}ZEROPNT', None)
+                hdr_zp = self.hdulist[pind].header.get(f'{color}ZEROPNT', None)
                 if hdr_zp: self.zero_point[color] = float(hdr_zp)
-                hdr_zp_std = self.hdulist[processed].header.get(f'{color}ZPSTD', None)
+                hdr_zp_std = self.hdulist[pind].header.get(f'{color}ZPSTD', None)
                 if hdr_zp_std: self.zero_point_stddev[color] = float(hdr_zp_std)
-                hdr_sb = self.hdulist[processed].header.get(f'{color}MSKY', None)
+                hdr_sb = self.hdulist[pind].header.get(f'{color}MSKY', None)
                 if hdr_sb: self.sky_brightness[color] = float(hdr_sb)
-                hdr_sb_std = self.hdulist[processed].header.get(f'{color}MSKYSTD', None)
+                hdr_sb_std = self.hdulist[pind].header.get(f'{color}MSKYSTD', None)
                 if hdr_sb_std: self.sky_brightness_stddev[color] = float(hdr_sb_std)
-                hdr_bo = self.hdulist[processed].header.get(f'{color}SKYOFF', None)
+                hdr_bo = self.hdulist[pind].header.get(f'{color}SKYOFF', None)
                 if hdr_bo: self.background_offset[color] = float(hdr_bo)
-                hdr_fs = self.hdulist[processed].header.get(f'{color}FLUXSCL', None)
+                hdr_fs = self.hdulist[pind].header.get(f'{color}FLUXSCL', None)
                 if hdr_fs: self.flux_scaling[color] = float(hdr_fs)
 
 
         # Build Catalogs
-        if 'Gaia DR3' not in self.hdu_names:
+        if 'Gaia DR3' not in [hdu.name for hdu in self.hdulist]:
             self.stars = {} # Dictionary of tables for catalog stars
         else:
             gaiaDR3 = self.getHDU('Gaia DR3')
@@ -169,9 +177,9 @@ class OSCImage(object):
     ## getHDU
     ##-------------------------------------------------------------------------
     def getHDU(self, name):
-        self.hdu_names = [hdu.name for hdu in self.hdulist]
+        hdu_names = [hdu.name for hdu in self.hdulist]
         try:
-            ind = self.hdu_names.index(name)
+            ind = hdu_names.index(name)
         except ValueError:
             ind = -1
         return ind
@@ -236,9 +244,9 @@ class OSCImage(object):
     ## get_wcs
     ##-------------------------------------------------------------------------
     def get_wcs(self):
-        processed = self.getHDU('PROCESSED')
-        if processed >= 0:
-            return wcs.WCS(self.hdulist[processed].header)
+        pind = self.getHDU('PROCESSED')
+        if pind >= 0:
+            return wcs.WCS(self.hdulist[pind].header)
         else:
             return None
 
