@@ -41,7 +41,7 @@ class OSCImage(object):
     reference - str: File name of reference image
     center_coord - SkyCoord
 
-    # Full Resolution Image Properties in self.ccd.header
+    # Image properties in self.ccd.header
     RAWFILE  - str: Raw file name
     FOVRAD   - float: Radius of FoV [deg]
     WCSMDOFF - float: Median offset between WCS and star centroid [pix]
@@ -51,7 +51,7 @@ class OSCImage(object):
     ELONGSD  - float: Std dev of elongation values
     RA       - str # Copy of center_coord info [hh:mm:ss.s]
     DEC      - str # Copy of center_coord info [dd:mm:ss.s]
-    # Color Properties in self.ccd.header
+    # Color specific properties in self.ccd.header
     cZEROPT  - float: Median zero point of stars [mag]
     cZEROSD  - float: Std dev of zero point values [mag]
     cSKYB    - float: Median sky brightness around stars [ADU]
@@ -248,10 +248,14 @@ class OSCImage(object):
         '''Write a Multi-Extension FITS file to hold the entire data model.
         '''
         processed_hdul = self.ccd.to_hdu()
+        processed_hdul[0].name = 'PROCESSED'
+        for hdu in processed_hdul:
+            print(color, hdu.header.get['EXTNAME'])
         for color in ['red', 'green', 'blue']:
             color_ccd = getattr(self, color)
             if color_ccd is not None:
                 color_hdul = color_ccd.to_hdu(as_image_hdu=True)
+                color_hdul[0].name = color.upper()
                 for hdu in color_hdul:
                     print(color, hdu.header.get['EXTNAME'])
                 processed_hdul.extend(color_hdul)
