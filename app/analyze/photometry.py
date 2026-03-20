@@ -22,9 +22,8 @@ def photometry(DM, cfg=None):
     sky_apertures = aperture.CircularAnnulus(positions, 2*star_r, 3*star_r)
 
     # Generate Background Subtracted Image for ApertureStats
-    image = u.Quantity(np.array(DM.data))
-#     scaled_image = u.Quantity(np.array(DM.data))/DM.exptime
-    backsub = u.Quantity(np.array(DM.data) - np.median(DM.data))
+    image = u.Quantity(DM.ccd.data)
+    backsub = u.Quantity(DM.ccd.data) - np.median(DM.ccd.data)
 
     ## Centroid stars and determine FWHM
     log.info(f'Centroiding catalog stars')
@@ -47,21 +46,20 @@ def photometry(DM, cfg=None):
     stars.add_column(Column(name='WCSOffsetY', data=deltaY))
     deltaR = (deltaX**2+deltaY**2)**0.5
     stars.add_column(Column(name='WCSOffsetR', data=deltaR))
-#     DM.WCS_offset_RMS_X = np.mean(stars['WCSOffsetX']**2)**0.5
-#     DM.WCS_offset_RMS_Y = np.mean(stars['WCSOffsetY']**2)**0.5
-    DM.WCS_median_offset = np.median(stars['WCSOffsetR'])
-    log.info(f'  WCS Median Offset = {DM.WCS_median_offset:.2f} pix')
+    median_offset = np.median(stars['WCSOffsetR'])
+    DM.ccd.header['WCSMDOFF'] = median_offset
+    log.info(f'  WCS Median Offset = {median_offset:.2f} pix')
 
     # Record Typical FWHM
     fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
     fwhm_mean, fwhm_median, fwhm_stddev = stats.sigma_clipped_stats(fwhm_values)
-    DM.fwhm = fwhm_median
-    DM.fwhm_stddev = fwhm_stddev
+    DM.ccd.header['FVWM'] = fwhm_median
+    DM.ccd.header['FWHMSD'] = fwhm_stddev
     log.info(f'  Typical FWHM = {fwhm_median:.1f} pix (stddev = {fwhm_stddev:.1f} pix)')
     elng_values = stars['elongation'][~np.isnan(stars['elongation'])]
     elng_mean, elng_median, elng_stddev = stats.sigma_clipped_stats(elng_values)
-    DM.elongation = elng_median
-    DM.elongation_stddev = elng_stddev
+    DM.ccd.header['ELONG'] = elng_median
+    DM.ccd.header['ELONGSD'] = elng_stddev
     log.info(f'  Typical elongation = {elng_median:.1f} (stddev = {elng_stddev:.1f})')
 
     ## Perform aperture photometry on stars
@@ -79,7 +77,6 @@ def photometry(DM, cfg=None):
         sky_area = sky_apertures.area_overlap(image, mask=cmask)
         stars.add_column(Column(name=f'{color}SkyArea', data=sky_area))
         stars.add_column(Column(name=f'{color}SkyMean', data=sky/sky_area))
-
 
         # Calculate Zero Point Values
         flux = stars[f'{color}StarSum'] - stars[f'{color}StarArea']*stars[f'{color}SkyMean']
@@ -110,8 +107,8 @@ def photometry(DM, cfg=None):
         # Record Typical ZeroPoint
         zp_values = stars[f'{color}ZeroPoint'][stars[f'{color}Photometry']]
         zp_mean, zp_median, zp_stddev = stats.sigma_clipped_stats(zp_values)
-        DM.zero_point[color] = zp_median
-        DM.zero_point_stddev[color] = zp_stddev
+        DM.ccd.header[f'{color}ZEROPT'] = zp_median
+        DM.ccd.header[f'{color}ZEROSD'] = zp_stddev
         log.info(f'  Typical Zero Point for {color} = {zp_median:.2f} mag (stddev = {zp_stddev:.2f} mag)')
 
         # Look at Zero Point statistics and flag outlier stars
@@ -120,14 +117,13 @@ def photometry(DM, cfg=None):
         stars.add_column(Column(name=f'{color}Outliers', data=outliers))
 
         # Estimate Sky Brightness
-        wcs = DM.get_wcs()
-        area_of_pixel = wcs.proj_plane_pixel_area().to(u.arcsec**2).value
+        area_of_pixel = DM.ccd.wcs.proj_plane_pixel_area().to(u.arcsec**2).value
         sky_mean_values = stars[f'{color}SkyMean']/area_of_pixel
         Msky = -2.5*np.log10(sky_mean_values) + zp_median
         stars.add_column(Column(name=f'{color}SkyMag', data=Msky))
         Msky_mean, Msky_median, Msky_stddev = stats.sigma_clipped_stats(Msky[stars[f'{color}Photometry']])
-        DM.sky_brightness[color] = Msky_median
-        DM.sky_brightness_stddev[color] = Msky_stddev
+        DM.ccd.header[f'{color}SKYB'] = Msky_median
+        DM.ccd.header[f'{color}SKYBSD'] = Msky_stddev
         log.info(f'  Typical Sky Brightness for {color} = {Msky_median:.2f} mag (stddev = {Msky_stddev:.2f} mag)')
 
     DM.stars[catalog] = stars

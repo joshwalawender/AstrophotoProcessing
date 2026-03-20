@@ -45,7 +45,7 @@ downsample = 2
 SIPorder = 1
 
 [Catalog]
-catalog = Gaia DR3
+catalog = Gaia_DR3
 GmagLimit = 16
 Gmag = Gmag
 Rmag = RPmag
@@ -68,30 +68,62 @@ stack = find_stack(data_dir, objectname)
 
 
 
+catalog = cfg['Catalog'].get('catalog')
 
-# raw_files_dir = data_dir / 'Raw'
-# raw_files = sorted(stack['RawFiles'])
-# working_dir = data_dir / objectname
-# master_bias_file = stack['DarkFile']
-# master_bias = OSCImage(master_bias_file)
-# catalog = cfg['Catalog'].get('catalog')
-# 
-# reference_file = working_dir / raw_files[0].name.replace('.fit', '_processed.fits')
-# reference_image = OSCImage(reference_file)
-# 
-# raw_file = raw_files[1]
-# working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
-# image = OSCImage(raw_file)
-# bias_subtract(image, master_bias=master_bias)
+im = OSCImage(data_dir / 'Raw' / sorted(stack['RawFiles'])[0])
+
+master_bias_file = stack['DarkFile']
+master_bias = OSCImage(master_bias_file)
+bias_subtract(im, master_bias=master_bias)
+# Get estimated center from target name
+try:
+    result = Simbad.query_object(objectname)
+    estimated = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                unit=(u.deg, u.deg), frame='icrs')
+except:
+    estimated = None
+center_coord = solve_field(im, cfg=cfg, center_coord=estimated, search_radius=1)
+reference_catalog = query_vizier(im, cfg=cfg)
+photometry(im, cfg=cfg)
+# reproject(im, reference_wcs=reference_image.get_wcs())
+# image.write(working_file)
+# image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
+# plot_WCSoffsets(image, cfg=cfg)
+# plot_zeropoints(image, cfg=cfg)
+# plot_skybrightness(image, cfg=cfg)
+
+
+
+im.write('foo.fits')
+
+sys.exit(0)
+
+
+
+
+raw_files_dir = data_dir / 'Raw'
+raw_files = sorted(stack['RawFiles'])
+working_dir = data_dir / objectname
+master_bias_file = stack['DarkFile']
+master_bias = OSCImage(master_bias_file)
+catalog = cfg['Catalog'].get('catalog')
+
+reference_file = working_dir / raw_files[0].name.replace('.fit', '_processed.fits')
+reference_image = OSCImage(reference_file)
+
+raw_file = raw_files[1]
+working_file = working_dir / raw_file.name.replace('.fit', '_processed.fits')
+image = OSCImage(raw_file)
+bias_subtract(image, master_bias=master_bias)
 # # Get estimated center from target name
-# try:
-#     result = Simbad.query_object(objectname)
-#     estimated_center = SkyCoord(result['ra'].value[0], result['dec'].value[0],
-#                                 unit=(u.deg, u.deg), frame='icrs')
-# except:
-#     estimated_center = None
-# center_coord = solve_field(image, cfg=cfg,
-#                            center_coord=estimated_center, search_radius=1)
+try:
+    result = Simbad.query_object(objectname)
+    estimated = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                unit=(u.deg, u.deg), frame='icrs')
+except:
+    estimated = None
+center_coord = solve_field(image, cfg=cfg,
+                           center_coord=estimated, search_radius=1)
 # reference_catalog = query_vizier(image, cfg=cfg)
 # photometry(image, cfg=cfg)
 # reproject(image, reference_wcs=reference_image.get_wcs())
@@ -101,7 +133,7 @@ stack = find_stack(data_dir, objectname)
 # plot_zeropoints(image, cfg=cfg)
 # plot_skybrightness(image, cfg=cfg)
 
-
+sys.exit(0)
 
 # Image List
 log.info('Loading input images to ImageList')

@@ -1,4 +1,6 @@
 import copy
+
+import numpy as np
 from astropy import units as u
 from astropy.time import Time
 from astropy.table import Table, Column
@@ -13,14 +15,14 @@ from app import log
 def query_vizier(DM, cfg=None):
     catalog = cfg['Catalog'].get('catalog')
     Gmag_limit = cfg['Catalog'].getfloat('GmagLimit')
-    Vizier_name = {'Gaia DR3': 'I/355/gaiadr3'}
+    Vizier_name = {'Gaia_DR3': 'I/355/gaiadr3'}
 
     from astroquery.vizier import Vizier
     vizier = Vizier(column_filters={"Gmag":f"<{Gmag_limit:.1f}"})
     vizier.ROW_LIMIT = 10000
     log.info(f'Querying Vizier for {catalog} stars')
     r = vizier.query_region(DM.center_coord,
-                            radius=DM.radius*u.deg,
+                            radius=DM.ccd.header.get('FOVRAD')*u.deg,
                             catalog=Vizier_name[catalog])
     assert len(r) > 0
     if len(r[0]) > 0:
@@ -32,18 +34,17 @@ def query_vizier(DM, cfg=None):
             if column in stars.keys():
                 stars.remove_column(column)
                 r[0].remove_column(column)
-        wcs = DM.get_wcs()
         coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                           unit=(u.deg, u.deg),
                           obstime=Time(2000, format='decimalyear'))
-        contains = wcs.footprint_contains(coords)
-        x, y = wcs.world_to_pixel(coords)
+        x, y = DM.ccd.wcs.world_to_pixel(coords)
         stars.add_column(Column(name='Catalog_X', data=x))
         stars.add_column(Column(name='Catalog_Y', data=y))
-
         log.info(f'  Retrieved {len(stars)} catalog stars in area')
+        Xcontains = [(val>0) & (val<DM.ccd.shape[1]) for val in x]
+        Ycontains = [(val>0) & (val<DM.ccd.shape[0]) for val in y]
+        contains = np.array(Xcontains) & np.array(Ycontains)
         log.info(f'  Image contains {len(stars[contains])} stars')
-
         DM.stars[catalog] = stars[contains]
         return r[0]
     else:

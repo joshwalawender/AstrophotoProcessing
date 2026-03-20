@@ -15,10 +15,12 @@ def bias_subtract(DM, master_bias=None):
 
     log.info('Subtracting bias')
     # Need to force data in to float to avoid uint wrapping for negative values
-    zeros = np.zeros(DM.data.shape, dtype=float)
-    image = DM.data.subtract(CCDData(zeros, unit='adu'))
+    zeros = np.zeros(DM.ccd.shape, dtype=float)
+    image = DM.ccd.subtract(CCDData(zeros, unit='adu'))
 #     bias_subtracted = ccdproc.subtract_bias(image, master_bias.data)
-    bias_subtracted = image.data - master_bias.data
-    DM.update_data(bias_subtracted,
-                   header=[('BIASSUB', True, 'Bias subtracted')],
-                   history=['Bias subtracted'])
+    DM.ccd.data = image.data - master_bias.ccd.data
+    DM.ccd.header['BIASSUB'] = True
+
+#     DM.update_data(bias_subtracted,
+#                    header=[('BIASSUB', True, 'Bias subtracted')],
+#                    history=['Bias subtracted'])

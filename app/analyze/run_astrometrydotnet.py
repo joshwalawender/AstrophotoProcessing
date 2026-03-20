@@ -69,15 +69,11 @@ def solve_field(DM, cfg={}, center_coord=None, search_radius=0.25):
     else:
         log.debug('Found solved file from astrometry.net')
         wcs_file = tfolder / tfile.name.replace('.fits', '.wcs')
-        new_wcs = wcs.WCS(str(wcs_file))
-        new_header = new_wcs.to_header(relax=True)
         # Update data model
-        DM.update_data(None, header=new_header.cards,
-                       history=['WCS solved by astrometry.net'])
+        DM.ccd.wcs = wcs.WCS(str(wcs_file))
         # Calculate and return center coordinate and field radius
-        center_coord = new_wcs.pixel_to_world(DM.data.shape[0]/2, DM.data.shape[1]/2)
-        center_coord_str = center_coord.to_string("hmsdms", sep=":", precision=1)
-        fp = new_wcs.calc_footprint(axes=DM.data.shape)
+        center_coord = DM.ccd.wcs.pixel_to_world(DM.ccd.shape[0]/2, DM.ccd.shape[1]/2)
+        fp = DM.ccd.wcs.calc_footprint(axes=DM.ccd.shape)
         dra = fp[:,0].max() - fp[:,0].min()
         ddec = fp[:,1].max() - fp[:,1].min()
         radius = np.sqrt((dra*np.cos(fp[:,1].mean()*np.pi/180.))**2 + ddec**2)/2.
@@ -85,9 +81,12 @@ def solve_field(DM, cfg={}, center_coord=None, search_radius=0.25):
         log.debug(f"Deleted temp file: {str(f)}")
         f.unlink()
     if center_coord is not None:
+        center_coord_str = center_coord.to_string("hmsdms", sep=":", precision=1)
         log.info(f'  Central Coordinate: {center_coord_str}')
         log.info(f'  FoV radius: {radius:.1f} deg')
         DM.center_coord = center_coord
-        DM.radius = radius
+        DM.ccd.meta['FOVRAD'] = radius
+        DM.ccd.meta['RA'] = center_coord_str.split()[0]
+        DM.ccd.meta['DEC'] = center_coord_str.split()[1]
     return center_coord
 
