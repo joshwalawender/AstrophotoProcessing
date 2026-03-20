@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 import re
 import numpy as np
@@ -44,7 +45,7 @@ class ImageList(list):
         self.imtype = imtype
         self.masters = masters
         self.objectname = objectname
-        self.summary_file = working_dir / objectname / f'{objectname}.txt'
+        self.summary_file = working_dir / f'{objectname}.txt'
         self.filters = []
         self.cfg = cfg
 #         self.sort(key=lambda x: x.raw_file_name)
@@ -59,7 +60,7 @@ class ImageList(list):
         FWHM < 8.2
         Elongation < 1.10
         '''
-        parsed = re.match('(\w+)\s([<>=]+)\s([\d\.]+)(%?)', filter_string)
+        parsed = re.match('(\\w+)\\s([<>=]+)\\s([\\d\.]+)(%?)', filter_string)
         if parsed is None:
             print(f"Failed to parse: {filter_string}")
             return
@@ -186,9 +187,8 @@ class ImageList(list):
         '''Re-project all images on to WCS of the reference image
         '''
         reference_image = self[self.reference]
-        reference_filename = reference_image.raw_file_name.replace('.fit', '_processed.fits')
         log.info(f'-----------------------------------------------------------')
-        log.info(f'Reprojecting Images: Reference is {reference_filename}')
+        log.info(f'Reprojecting Images: Reference is {reference_image.raw_file_name}')
         reference_wcs = reference_image.get_wcs()
         for i,image in enumerate(self):
             log.info(f'Reprojecting file {i+1}/{len(self)}: {image.raw_file_name}')
@@ -199,39 +199,59 @@ class ImageList(list):
         log.info(f'-----------------------------------------------------------')
         log.info(f'Combining Images:')
         reds = []
+        red_scale = []
         greens = []
+        green_scale = []
         blues = []
+        blue_scale = []
         for i,image in enumerate(self):
             if self.results[i]['Use?'] == True:
                 log.info(f'Opening file {i+1}/{len(self)} for stacking: {image.raw_file_name}')
                 reds.append(image.red)
+                red_scale.append(self.results['RFluxScaling'][i])
                 greens.append(image.green)
+                green_scale.append(self.results['GFluxScaling'][i])
                 blues.append(image.blue)
+                blue_scale.append(self.results['BFluxScaling'][i])
 
         log.info(f'Combining {len(reds)} red images')
         red_combiner = ccdproc.Combiner(reds)
-        red_combiner.scaling=self.results['RFluxScaling'].data
-        red_stacked = red_combiner.sigma_clipping()
+#         red_combiner.scaling=red_scale
+#         red_stacked = red_combiner.average_combine()
+#         red_stacked = red_combiner.clip_extrema(nhigh=3, nlow=1)
+
+        red_stacked = red_combiner.sigma_clipping(low_thresh=5, high_thresh=5, func=np.ma.median)
         red_file = Path('red.fits')
         if red_file.exists(): red_file.unlink()
         ccdproc.fits_ccddata_writer(red_stacked, red_file)
 
         log.info(f'Combining {len(greens)} green images')
         green_combiner = ccdproc.Combiner(greens)
-        green_combiner.scaling=self.results['GFluxScaling'].data
-        green_stacked = green_combiner.sigma_clipping()
+#         green_combiner.scaling=green_scale
+#         green_stacked = green_combiner.average_combine()
+#         green_stacked = green_combiner.clip_extrema(nhigh=3, nlow=1)
+        green_stacked = green_combiner.sigma_clipping(low_thresh=5, high_thresh=5, func=np.ma.median)
         green_file = Path('green.fits')
         if green_file.exists(): green_file.unlink()
         ccdproc.fits_ccddata_writer(green_stacked, green_file)
 
         log.info(f'Combining {len(blues)} blue images')
         blue_combiner = ccdproc.Combiner(blues)
-        blue_combiner.scaling=self.results['BFluxScaling'].data
-        blue_stacked = blue_combiner.sigma_clipping()
+#         blue_combiner.scaling=blue_scale
+#         blue_stacked = blue_combiner.average_combine()
+#         blue_stacked = blue_combiner.clip_extrema(nhigh=3, nlow=1)
+        blue_stacked = blue_combiner.sigma_clipping(low_thresh=5, high_thresh=5, func=np.ma.median)
         blue_file = Path('blue.fits')
         if blue_file.exists(): blue_file.unlink()
         ccdproc.fits_ccddata_writer(blue_stacked, blue_file)
         
+    def write_all(self):
+        for image in self:
+            working_file_name = image.raw_file_name.replace('.fit', '_processed.fits')
+            working_file = self.working_dir / working_file_name
+            log.info(f'Writing {working_file.name}')
+            image.write(working_file)
+
 
     def plot_image_quality(self):
         use = np.array(self.results['Use?'].data, dtype=bool)

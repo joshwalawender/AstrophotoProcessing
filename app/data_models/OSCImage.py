@@ -321,12 +321,12 @@ class OSCImage(object):
         # Three Colors
         for color in ['Red', 'Green', 'Blue']:
             cind = self.getHDU(color)
-            chdu = getattr(self, color.lower()).to_hdu(as_image_hdu=True)[0]
-            chdu.header.set('EXTNAME', color)
+            chdul = getattr(self, color.lower()).to_hdu(as_image_hdu=True)
+            chdul[0].header.set('EXTNAME', color)
             if cind == -1:
-                self.hdulist.append(chdu)
+                self.hdulist.append(chdul[0])
             else:
-                self.hdulist[cind] = chdu
+                self.hdulist[cind] = chdul[0]
 
         # Write Catalog Stars to FITS Table
         for catalog in self.stars.keys():

@@ -106,23 +106,33 @@ stack = find_stack(data_dir, objectname)
 # Image List
 log.info('Loading input images to ImageList')
 raw_image_dir = data_dir/'Raw'
-images = ImageList([rf for rf in stack['RawFiles']],
-                   working_dir=data_dir / objectname,
-                   objectname=objectname,
-                   masters={'bias': OSCImage(stack['DarkFile'])},
-                   cfg=cfg)
-if images.summary_file.exists():
+raw_files = [rf for rf in stack['RawFiles']]
+working_dir = data_dir / objectname
+if working_dir.exists():
+	processed_files = [f for f in working_dir.glob('*fits')]
+else:
+	processed_files = []
+
+if len(processed_files) == len(raw_files):
+    images = ImageList(processed_files,
+                       working_dir=working_dir,
+                       objectname=objectname,
+                       cfg=cfg)
     print('Reading results file on disk')
     images.results = Table.read(images.summary_file, format='ascii.csv')
-else:
+else:    
+    images = ImageList(raw_files,
+                       working_dir=working_dir,
+                       objectname=objectname,
+                       masters={'bias': OSCImage(stack['DarkFile'])},
+                       cfg=cfg)
     images.process()
     images.set_reference_image('FWHM', op='min')
     images.reproject()
     summary_file = data_dir / objectname / images.summary_file.name
+    if summary_file.exists(): summary_file.unlink()
     images.results.write(summary_file, format='ascii.csv')
-
-use = images.results['Use?']
-print(images.results['GFluxScaling'].data)
+    images.write_all()
 
 images.add_filter('FWHM < 90%')
 images.add_filter('WCSOffset < 0.20')
