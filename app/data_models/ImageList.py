@@ -19,15 +19,7 @@ from app.analyze.derive_scaling import derive_scaling
 
 
 class ImageList(list):
-    '''The main list contain the image data models. This may be bad use of memory?
-
-    Hold master files in dictionary attached to this ImageList.
-
-    Add method to iterate over contents, read properties and output table of
-    image properties?
-
-    Method to iterate over list, run the specified functions and optionally
-    save out files?
+    '''A list containing the image data models (OSCImage objects).
     '''
     def __init__(self, iterable, working_dir=None, masters={},
                  objectname=None,

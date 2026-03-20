@@ -69,11 +69,30 @@ stack = find_stack(data_dir, objectname)
 
 
 catalog = cfg['Catalog'].get('catalog')
-
-im = OSCImage(data_dir / 'Raw' / sorted(stack['RawFiles'])[0])
-
+working_dir = data_dir / objectname
 master_bias_file = stack['DarkFile']
 master_bias = OSCImage(master_bias_file)
+
+image_file = data_dir / 'Raw' / sorted(stack['RawFiles'])[0]
+working_file = data_dir / objectname / image_file.name
+refim = OSCImage(image_file)
+bias_subtract(refim, master_bias=master_bias)
+# Get estimated center from target name
+try:
+    result = Simbad.query_object(objectname)
+    estimated = SkyCoord(result['ra'].value[0], result['dec'].value[0],
+                                unit=(u.deg, u.deg), frame='icrs')
+except:
+    estimated = None
+center_coord = solve_field(refim, cfg=cfg, center_coord=estimated, search_radius=1)
+reference_catalog = query_vizier(refim, cfg=cfg)
+photometry(refim, cfg=cfg)
+refim.split_colors()
+refim.write(working_file)
+
+image_file = data_dir / 'Raw' / sorted(stack['RawFiles'])[40]
+working_file = data_dir / objectname / image_file.name
+im = OSCImage(image_file)
 bias_subtract(im, master_bias=master_bias)
 # Get estimated center from target name
 try:
@@ -85,16 +104,12 @@ except:
 center_coord = solve_field(im, cfg=cfg, center_coord=estimated, search_radius=1)
 reference_catalog = query_vizier(im, cfg=cfg)
 photometry(im, cfg=cfg)
-# reproject(im, reference_wcs=reference_image.get_wcs())
-# image.write(working_file)
-# image.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
-# plot_WCSoffsets(image, cfg=cfg)
-# plot_zeropoints(image, cfg=cfg)
-# plot_skybrightness(image, cfg=cfg)
-
-
-
-im.write('foo.fits')
+reproject(im, reference_wcs=refim.ccd.wcs)
+im.write(working_file)
+# im.write_jpg(radius=cfg['Photometry'].getfloat('StarApertureRadius'))
+# plot_WCSoffsets(im, cfg=cfg)
+# plot_zeropoints(im, cfg=cfg)
+# plot_skybrightness(im, cfg=cfg)
 
 sys.exit(0)
 
