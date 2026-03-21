@@ -9,7 +9,8 @@ from app import log
 ## 
 ##-------------------------------------------------------------------------
 def derive_scaling(DM, reference=None, cfg=None):
-    log.info(f'Deriving image scaling parameters: {DM.raw_file_name}')
+    filename = DM.ccd.header.get('RAWFILE')
+    log.info(f'Deriving image scaling parameters: {filename}')
     catalog = cfg['Catalog'].get('catalog')
     stars = DM.stars.get(catalog, [])
     refstars = reference.stars.get(catalog, [])
@@ -45,6 +46,6 @@ def derive_scaling(DM, reference=None, cfg=None):
         bko_mean, bko_median, bko_stddev = stats.sigma_clipped_stats(offset[~offset.mask])
         scale = stars[f'{c}StarSum'] / stars[f'{c}MatchedStarSum']
         fls_mean, fls_median, fls_stddev = stats.sigma_clipped_stats(scale[~scale.mask])
-        DM.reference = reference.raw_file_name
-        DM.background_offset[c] = bko_median #(bko_median, bko_stddev)
-        DM.flux_scaling[c] = fls_median #(fls_median, fls_stddev)
+        DM.reference = reference.ccd.header.get('RAWFILE')
+        DM.ccd.header[f'{c}BKGOFF'] = bko_median
+        DM.ccd.header[f'{c}SCALE'] = fls_median

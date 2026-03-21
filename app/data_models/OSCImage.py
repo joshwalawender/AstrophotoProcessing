@@ -215,7 +215,7 @@ class OSCImage(object):
             if color_ccd is not None:
                 color_hdul = color_ccd.to_hdu()
                 color_hdul[0].name = color.upper()
-                color_file = filename.parent / filename.name.replace(ext, f'{color[0].upper()}{ext}')
+                color_file = filename.parent / filename.name.replace(ext, f'_{color[0].upper()}{ext}')
                 log.info(f'Writing {color} file: {color_file} with {len(color_hdul)} extensions')
                 color_hdul.writeto(color_file, overwrite=overwrite)
 

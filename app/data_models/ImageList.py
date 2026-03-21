@@ -75,7 +75,6 @@ class ImageList(list):
         log.info(f'  Filter removed {deltaN} data points {n_after} now in use')
 
     def initialize_image_metadata_table(self):
-    	
         self.results = Table([Column([i.ccd.header.get('RAWFILE') for i in self], 'RawFile', str),
                               Column(['']*len(self), 'RA', 'S11'),
                               Column(['']*len(self), 'Dec', 'S12'),
@@ -237,7 +236,8 @@ class ImageList(list):
         
     def write_all(self):
         for image in self:
-            working_file_name = image.raw_file_name.replace('.fit', '_processed.fits')
+			raw_file_name = image.ccd.header.get('RAWFILE')
+            working_file_name = raw_file_name.replace('.fit', '.fits')
             working_file = self.working_dir / working_file_name
             log.info(f'Writing {working_file.name}')
             image.write(working_file)
