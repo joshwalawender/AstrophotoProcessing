@@ -75,7 +75,8 @@ class ImageList(list):
         log.info(f'  Filter removed {deltaN} data points {n_after} now in use')
 
     def initialize_image_metadata_table(self):
-        self.results = Table([Column([i.raw_file_name for i in self], 'RawFile', str),
+    	
+        self.results = Table([Column([i.ccd.header.get('RAWFILE') for i in self], 'RawFile', str),
                               Column(['']*len(self), 'RA', 'S11'),
                               Column(['']*len(self), 'Dec', 'S12'),
                               Column([np.nan]*len(self), 'WCSOffset', float),
@@ -120,14 +121,15 @@ class ImageList(list):
             center_coord = None
         
         for i,image in enumerate(self):
+            imname = image.ccd.header.get('RAWFILE')
             log.info(f'-----------------------------------------------------------')
-            log.info(f'Processing file {i+1}/{len(self)}: {image.raw_file_name}')
+            log.info(f'Processing file {i+1}/{len(self)}: {imname}')
             bias_subtract(image, master_bias=self.masters['bias'])
             center_coord = solve_field(image, cfg=self.cfg,
                                        center_coord=center_coord,
                                        search_radius=0.5)
             if center_coord is None:
-                log.warning(f'Plate solve for {image.raw_file_name} failed')
+                log.warning(f'Plate solve for {imname} failed')
             else:
                 if reference_catalog is None:
                     reference_catalog = query_vizier(image, cfg=self.cfg)
@@ -137,21 +139,14 @@ class ImageList(list):
             radecstr = image.center_coord.to_string('hmsdms', sep=':', precision=2)
             self.results[i]['RA'] = radecstr.split()[0]
             self.results[i]['Dec'] = radecstr.split()[1]
-            self.results[i]['WCSOffset'] = image.WCS_median_offset
-            self.results[i]['FWHM'] = image.fwhm
-            self.results[i]['Elongation'] = image.elongation
-            self.results[i]['RZeroPoint'] = image.zero_point['R']
-            self.results[i]['RZeroPointStdDev'] = image.zero_point_stddev['R']
-            self.results[i]['RSkyBrightness'] = image.sky_brightness['R']
-            self.results[i]['RSkyBrightnessStdDev'] = image.sky_brightness_stddev['R']
-            self.results[i]['GZeroPoint'] = image.zero_point['G']
-            self.results[i]['GZeroPointStdDev'] = image.zero_point_stddev['G']
-            self.results[i]['GSkyBrightness'] = image.sky_brightness['G']
-            self.results[i]['GSkyBrightnessStdDev'] = image.sky_brightness_stddev['G']
-            self.results[i]['BZeroPoint'] = image.zero_point['B']
-            self.results[i]['BZeroPointStdDev'] = image.zero_point_stddev['B']
-            self.results[i]['BSkyBrightness'] = image.sky_brightness['B']
-            self.results[i]['BSkyBrightnessStdDev'] = image.sky_brightness_stddev['B']
+            self.results[i]['WCSOffset'] = image.ccd.header.get('WCSMDOFF')
+            self.results[i]['FWHM'] = image.ccd.header.get('FWHM')
+            self.results[i]['Elongation'] = image.ccd.header.get('ELONG')
+            for c in ['R', 'G', 'B']:
+                self.results[i][f'{c}ZeroPoint'] = image.ccd.header.get(f'{c}ZEROPT')
+                self.results[i][f'{c}ZeroPointStdDev'] = image.ccd.header.get(f'{c}ZEROSD')
+                self.results[i][f'{c}SkyBrightness'] = image.ccd.header.get(f'{c}SKYB')
+                self.results[i][f'{c}SkyBrightnessStdDev'] = image.ccd.header.get(f'{c}SKYBSD')
 
 
     def set_reference_image(self, optimizer, op='min'):
@@ -165,25 +160,28 @@ class ImageList(list):
             value = self.results[optimizer][self.reference]
             log.info(f"Maximum {optimizer} is {value} for frame {self.reference}")
         reference_image = self[self.reference]
-        reference_filename = reference_image.raw_file_name.replace('.fit', '_processed.fits')
+        
+        reference_filename = reference_image.ccd.header.get('RAWFILE').replace('.fit', '_processed.fits')
         log.info(f'-----------------------------------------------------------')
         log.info(f'Determining Scaling: Reference is {reference_filename}')
         for i,image in enumerate(self):
             derive_scaling(image, reference=reference_image, cfg=self.cfg)
             for c in ['R', 'G', 'B']:
-                self.results[f'{c}FluxScaling'] = image.flux_scaling[c]
-                self.results[f'{c}SkyOffset'] = image.background_offset[c]
+                self.results[f'{c}FluxScaling'] = image.ccd.header.get(f'{c}SCALE')
+                self.results[f'{c}SkyOffset'] = image.ccd.header.get(f'{c}BKGOFF')
 
 
     def reproject(self):
         '''Re-project all images on to WCS of the reference image
         '''
         reference_image = self[self.reference]
+        reference_filename = reference_image.ccd.header.get('RAWFILE').replace('.fit', '_processed.fits')
         log.info(f'-----------------------------------------------------------')
-        log.info(f'Reprojecting Images: Reference is {reference_image.raw_file_name}')
-        reference_wcs = reference_image.get_wcs()
+        log.info(f'Reprojecting Images: Reference is {reference_filename}')
+        reference_wcs = reference_image.ccd.wcs
         for i,image in enumerate(self):
-            log.info(f'Reprojecting file {i+1}/{len(self)}: {image.raw_file_name}')
+            filename = image.ccd.header.get('RAWFILE')
+            log.info(f'Reprojecting file {i+1}/{len(self)}: {filename}')
             reproject(image, reference_wcs=reference_wcs)
 
 
@@ -197,8 +195,9 @@ class ImageList(list):
         blues = []
         blue_scale = []
         for i,image in enumerate(self):
+            filename = image.ccd.header.get('RAWFILE')
             if self.results[i]['Use?'] == True:
-                log.info(f'Opening file {i+1}/{len(self)} for stacking: {image.raw_file_name}')
+                log.info(f'Opening file {i+1}/{len(self)} for stacking: {filename}')
                 reds.append(image.red)
                 red_scale.append(self.results['RFluxScaling'][i])
                 greens.append(image.green)
@@ -211,7 +210,6 @@ class ImageList(list):
 #         red_combiner.scaling=red_scale
 #         red_stacked = red_combiner.average_combine()
 #         red_stacked = red_combiner.clip_extrema(nhigh=3, nlow=1)
-
         red_stacked = red_combiner.sigma_clipping(low_thresh=5, high_thresh=5, func=np.ma.median)
         red_file = Path('red.fits')
         if red_file.exists(): red_file.unlink()

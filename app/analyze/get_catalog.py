@@ -57,11 +57,12 @@ def apply_catalog(DM, reference_catalog, cfg=None):
     coords = SkyCoord(stars['RAJ2000'], stars['DEJ2000'], frame=ICRS,
                       unit=(u.deg, u.deg),
                       obstime=Time(2000, format='decimalyear'))
-    wcs = DM.get_wcs()
-    contains = wcs.footprint_contains(coords)
-    x, y = wcs.world_to_pixel(coords)
+    x, y = DM.ccd.wcs.world_to_pixel(coords)
     stars.add_column(Column(name='Catalog_X', data=x))
     stars.add_column(Column(name='Catalog_Y', data=y))
+    Xcontains = [(val>0) & (val<DM.ccd.shape[1]) for val in x]
+    Ycontains = [(val>0) & (val<DM.ccd.shape[0]) for val in y]
+    contains = np.array(Xcontains) & np.array(Ycontains)
     log.info(f'  Image contains {len(stars[contains])} stars')
     DM.stars[catalog] = stars[contains]
 
