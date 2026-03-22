@@ -130,7 +130,6 @@ if len(processed_files) == len(raw_files):
                        working_dir=working_dir,
                        objectname=objectname,
                        cfg=cfg)
-    print('Reading results file on disk')
     images.results = Table.read(images.summary_file, format='ascii.csv')
 else:    
     images = ImageList(raw_files,
@@ -139,15 +138,15 @@ else:
                        masters={'bias': OSCImage(stack['DarkFile'])},
                        cfg=cfg)
     images.process()
-    images.set_reference_image('FWHM', op='min')
-    images.reproject()
     summary_file = data_dir / objectname / images.summary_file.name
     if summary_file.exists(): summary_file.unlink()
     images.results.write(summary_file, format='ascii.csv')
     images.write_all()
 
-images.add_filter('FWHM < 90%')
-images.add_filter('WCSOffset < 0.20')
-images.plot_image_quality()
-images.plot_photometry()
-images.combine()
+images.set_reference_image('FWHM', op='min')
+images.reproject()
+# images.add_filter('FWHM < 90%')
+# images.add_filter('WCSOffset < 0.20')
+# images.plot_image_quality()
+# images.plot_photometry()
+# images.combine()
