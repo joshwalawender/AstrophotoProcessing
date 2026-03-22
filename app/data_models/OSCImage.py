@@ -15,7 +15,7 @@ warnings.simplefilter('ignore', category=VerifyWarning)
 from astropy.nddata import CCDData, block_reduce, block_replicate
 from astropy.table import Table
 from astropy.coordinates import SkyCoord, ICRS
-from astropy import wcs
+from astropy.wcs import WCS
 from astropy import visualization as vis
 from astropy import samp
 import ccdproc
@@ -94,11 +94,16 @@ class OSCImage(object):
         else:
             # Read in existing data model
             pind = self.getHDU(hdulist, "PROCESSED")
-            processed_data = hdulist[pind]
             mind = self.getHDU(hdulist, "MASK")
-            mask_data = hdulist[mind] if mind >= 0 else None
-            self.ccd = CCDData(data=processed_data,
-                               mask=mask_data)
+            if mind < 0:
+                self.ccd = CCDData(data=hdulist[pind].data,
+                                   unit='adu')
+            else:
+                self.ccd = CCDData(data=hdulist[pind].data,
+                                   mask=hdulist[mind].data,
+                                   unit='adu')
+            self.ccd.header = hdulist[pind].header
+            self.ccd.wcs = WCS(hdulist[pind].header)
             self.build_color_mask()
             self.red = None
             self.green = None
@@ -198,14 +203,14 @@ class OSCImage(object):
         hdunames = [hdu.header.get('EXTNAME') for hdu in processed_hdul]
         log.info(f'Output file will have {len(hdunames)} image extensions:')
         for i,hdu in enumerate(processed_hdul):
-            log.info(f"  {i}: {hdunames[i]}")
+            log.debug(f"  {i}: {hdunames[i]}")
         # Write Catalog Stars to FITS Table
         log.info(f'Output file will have {len(self.stars.keys())} table extensions:')
         for catalog in self.stars.keys():
             FITStable = fits.table_to_hdu(self.stars[catalog])
             FITStable.header.set('EXTNAME', f"CAT_{catalog}")
             processed_hdul.append(FITStable)
-            log.info(f"  {i}: {FITStable.header.get('EXTNAME')}")
+            log.debug(f"  {i}: {FITStable.header.get('EXTNAME')}")
         # Write to file
         processed_hdul.writeto(filename, overwrite=overwrite)
 
@@ -216,7 +221,7 @@ class OSCImage(object):
                 color_hdul = color_ccd.to_hdu()
                 color_hdul[0].name = color.upper()
                 color_file = filename.parent / filename.name.replace(ext, f'_{color[0].upper()}{ext}')
-                log.info(f'Writing {color} file: {color_file} with {len(color_hdul)} extensions')
+                log.info(f'Writing {color} file {color_file.name} with {len(color_hdul)} extensions')
                 color_hdul.writeto(color_file, overwrite=overwrite)
 
 
