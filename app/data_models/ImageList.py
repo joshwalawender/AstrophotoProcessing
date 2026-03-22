@@ -236,7 +236,7 @@ class ImageList(list):
         
     def write_all(self):
         for image in self:
-			raw_file_name = image.ccd.header.get('RAWFILE')
+            raw_file_name = image.ccd.header.get('RAWFILE')
             working_file_name = raw_file_name.replace('.fit', '.fits')
             working_file = self.working_dir / working_file_name
             log.info(f'Writing {working_file.name}')

@@ -53,7 +53,7 @@ def photometry(DM, cfg=None):
     # Record Typical FWHM
     fwhm_values = stars['FWHM'][~np.isnan(stars['FWHM'])]
     fwhm_mean, fwhm_median, fwhm_stddev = stats.sigma_clipped_stats(fwhm_values)
-    DM.ccd.header['FVWM'] = fwhm_median
+    DM.ccd.header['FWWM'] = fwhm_median
     DM.ccd.header['FWHMSD'] = fwhm_stddev
     log.info(f'  Typical FWHM = {fwhm_median:.1f} pix (stddev = {fwhm_stddev:.1f} pix)')
     elng_values = stars['elongation'][~np.isnan(stars['elongation'])]
